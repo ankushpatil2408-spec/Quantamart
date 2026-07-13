@@ -1,0 +1,6 @@
+{
+  "name": "Full-Stack Spring Boot E-Commerce",
+  "description": "A production-ready Spring Boot E-Commerce application with an H2 In-Memory Database and dynamic HTML5/CSS3/JS frontend.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
