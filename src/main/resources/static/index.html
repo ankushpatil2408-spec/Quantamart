@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CRAFTED — Curated Shop</title>
+    <title>Quantamart — Curated Shop</title>
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,11 +19,12 @@
         <div class="header-container">
             <div class="logo">
                 <i data-lucide="package" class="logo-icon"></i>
-                <span class="logo-text">CRAFTED</span>
+                <span class="logo-text">Quantamart</span>
             </div>
             <nav class="nav-links">
                 <a href="#" class="nav-link active">Shop</a>
                 <a href="/h2-console" target="_blank" class="nav-link console-link">H2 Console</a>
+                <span id="authSection" class="auth-section"></span>
             </nav>
             <button id="cartBtn" class="cart-btn" aria-label="Open Cart">
                 <i data-lucide="shopping-bag"></i>
@@ -84,7 +85,7 @@
     <footer class="footer">
         <div class="footer-container">
             <div class="footer-left">
-                <p>&copy; 2026 CRAFTED Essentials, Inc. All rights reserved.</p>
+                <p>&copy; 2026 Quantamart Essentials, Inc. All rights reserved.</p>
                 <p class="footer-meta">Powered by Spring Boot 3.2, H2 Database, JPA, and Vanilla JavaScript.</p>
             </div>
             <div class="footer-right">
@@ -148,6 +149,67 @@
                         <i data-lucide="credit-card"></i> Place Order
                     </button>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth Modal (Login / Register) -->
+    <div id="authModal" class="modal detail-modal">
+        <div class="modal-overlay" id="authOverlay"></div>
+        <div class="modal-content detail-content auth-modal-content">
+            <div class="modal-header">
+                <h2 id="authModalTitle">Sign In</h2>
+                <button id="closeAuthBtn" class="close-btn" aria-label="Close Auth">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Registration Toggle Warning / Info -->
+                <div class="auth-toggle-info">
+                    <p id="authToggleMsg">Don't have an account?</p>
+                    <button id="toggleAuthModeBtn" class="toggle-auth-link">Sign Up</button>
+                </div>
+
+                <form id="authForm" class="auth-form">
+                    <div class="form-group">
+                        <label for="authUsername">Username</label>
+                        <input type="text" id="authUsername" required placeholder="Enter username">
+                    </div>
+                    
+                    <div id="emailFormGroup" class="form-group hidden">
+                        <label for="authEmail">Email Address</label>
+                        <input type="email" id="authEmail" placeholder="you@example.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="authPassword">Password</label>
+                        <input type="password" id="authPassword" required placeholder="••••••••">
+                    </div>
+
+                    <div id="roleFormGroup" class="form-group hidden">
+                        <label for="authRole">Select Role</label>
+                        <select id="authRole" class="form-select">
+                            <option value="CUSTOMER">Customer</option>
+                            <option value="SELLER">Seller</option>
+                            <option value="ADMIN">Admin</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" id="authSubmitBtn" class="submit-order-btn">
+                        <i data-lucide="log-in"></i> Sign In
+                    </button>
+                </form>
+
+                <!-- Quick Seed accounts help -->
+                <div id="quickSeedHelp" class="quick-seed-help">
+                    <h4>Test Accounts:</h4>
+                    <ul>
+                        <li><strong>Customer:</strong> customer / customer123</li>
+                        <li><strong>Seller:</strong> seller / seller123</li>
+                        <li><strong>Admin:</strong> admin / admin123</li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>

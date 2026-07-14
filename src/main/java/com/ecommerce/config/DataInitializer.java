@@ -1,29 +1,38 @@
 package com.ecommerce.config;
 
 import com.ecommerce.model.Product;
+import com.ecommerce.model.User;
+import com.ecommerce.model.Role;
 import com.ecommerce.repository.ProductRepository;
+import com.ecommerce.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
 
 /**
- * CommandLineRunner to seed the database with mock products.
+ * CommandLineRunner to seed the database with mock products and users.
  * Path: src/main/java/com/ecommerce/config/DataInitializer.java
  */
 @Component
 public class DataInitializer implements CommandLineRunner {
 
     private final ProductRepository productRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Autowired
-    public DataInitializer(ProductRepository productRepository) {
+    public DataInitializer(ProductRepository productRepository, UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.productRepository = productRepository;
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
     public void run(String... args) throws Exception {
+        // Seed Products
         if (productRepository.count() == 0) {
             Product p1 = new Product(
                 "Minimalist Leather Backpack",
@@ -76,6 +85,31 @@ public class DataInitializer implements CommandLineRunner {
 
             productRepository.saveAll(Arrays.asList(p1, p2, p3, p4, p5, p6));
             System.out.println("H2 In-Memory Database initialized with 6 premium product items.");
+        }
+
+        // Seed Users
+        if (userRepository.count() == 0) {
+            User admin = new User(
+                "admin",
+                "admin@quantamart.com",
+                passwordEncoder.encode("admin123"),
+                Role.ADMIN
+            );
+            User seller = new User(
+                "seller",
+                "seller@quantamart.com",
+                passwordEncoder.encode("seller123"),
+                Role.SELLER
+            );
+            User customer = new User(
+                "customer",
+                "customer@quantamart.com",
+                passwordEncoder.encode("customer123"),
+                Role.CUSTOMER
+            );
+
+            userRepository.saveAll(Arrays.asList(admin, seller, customer));
+            System.out.println("H2 In-Memory Database initialized with 3 default users (admin, seller, customer).");
         }
     }
 }

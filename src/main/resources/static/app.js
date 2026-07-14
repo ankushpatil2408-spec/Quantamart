@@ -1,5 +1,5 @@
 /**
- * CRAFTED E-Commerce Client-side Script
+ * Quantamart E-Commerce Client-side Script
  * Path: src/main/resources/static/app.js
  */
 
@@ -7,6 +7,8 @@
 let products = [];
 let cart = []; // Array of { product: Product, quantity: Number }
 let activeCategory = 'all';
+let authUser = JSON.parse(localStorage.getItem('authUser')) || null;
+let authMode = 'login'; // 'login' or 'register'
 
 // DOM Elements
 const productGrid = document.getElementById('productGrid');
@@ -28,6 +30,23 @@ const detailBody = document.getElementById('detailBody');
 const toast = document.getElementById('toast');
 const filterPills = document.querySelectorAll('.filter-pill');
 
+// Auth DOM Elements
+const authSection = document.getElementById('authSection');
+const authModal = document.getElementById('authModal');
+const closeAuthBtn = document.getElementById('closeAuthBtn');
+const authOverlay = document.getElementById('authOverlay');
+const toggleAuthModeBtn = document.getElementById('toggleAuthModeBtn');
+const authModalTitle = document.getElementById('authModalTitle');
+const authToggleMsg = document.getElementById('authToggleMsg');
+const authSubmitBtn = document.getElementById('authSubmitBtn');
+const emailFormGroup = document.getElementById('emailFormGroup');
+const roleFormGroup = document.getElementById('roleFormGroup');
+const authForm = document.getElementById('authForm');
+const authUsername = document.getElementById('authUsername');
+const authEmail = document.getElementById('authEmail');
+const authPassword = document.getElementById('authPassword');
+const authRole = document.getElementById('authRole');
+
 // API Endpoints
 const PRODUCTS_API = '/api/products';
 const ORDERS_API = '/api/orders';
@@ -35,6 +54,7 @@ const ORDERS_API = '/api/orders';
 // Initialize on Load
 window.addEventListener('DOMContentLoaded', () => {
     fetchProducts();
+    updateAuthUI();
     setupEventListeners();
 });
 
@@ -277,11 +297,16 @@ async function handleCheckout(e) {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<div class="spinner" style="width: 18px; height: 18px; border-width: 2px;"></div> Submitting...';
         
+        const reqHeaders = {
+            'Content-Type': 'application/json'
+        };
+        if (authUser && authUser.token) {
+            reqHeaders['Authorization'] = `Bearer ${authUser.token}`;
+        }
+        
         const response = await fetch(ORDERS_API, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: reqHeaders,
             body: JSON.stringify(orderData)
         });
         
@@ -362,6 +387,14 @@ function setupEventListeners() {
     // Checkout form handler
     checkoutForm.addEventListener('submit', handleCheckout);
     
+    // Auth Modal Bindings
+    closeAuthBtn.addEventListener('click', closeAuth);
+    authOverlay.addEventListener('click', closeAuth);
+    toggleAuthModeBtn.addEventListener('click', () => {
+        setAuthMode(authMode === 'login' ? 'register' : 'login');
+    });
+    authForm.addEventListener('submit', handleAuthSubmit);
+    
     // Category pills filter binds
     filterPills.forEach(pill => {
         pill.addEventListener('click', () => {
@@ -371,4 +404,136 @@ function setupEventListeners() {
             renderProducts();
         });
     });
+}
+
+// Authentication UI & State Handlers
+function updateAuthUI() {
+    if (authUser) {
+        authSection.innerHTML = `
+            <div class="auth-user-info">
+                <span>Hi, <strong>${authUser.username}</strong></span>
+                <span class="auth-user-badge">${authUser.role}</span>
+                <button id="authLogoutBtn" class="auth-btn-logout">Logout</button>
+            </div>
+        `;
+        document.getElementById('authLogoutBtn').addEventListener('click', handleLogout);
+    } else {
+        authSection.innerHTML = `
+            <button id="authOpenBtn" class="auth-btn-login">
+                <i data-lucide="user" style="width: 14px; height: 14px;"></i> Sign In
+            </button>
+        `;
+        document.getElementById('authOpenBtn').addEventListener('click', openAuth);
+    }
+    
+    if (window.lucide) {
+        lucide.createIcons();
+    }
+}
+
+function openAuth() {
+    authModal.classList.add('active');
+    authForm.reset();
+    setAuthMode('login');
+}
+
+function closeAuth() {
+    authModal.classList.remove('active');
+}
+
+function setAuthMode(mode) {
+    authMode = mode;
+    if (mode === 'login') {
+        authModalTitle.textContent = 'Sign In';
+        authToggleMsg.textContent = "Don't have an account?";
+        toggleAuthModeBtn.textContent = 'Sign Up';
+        emailFormGroup.classList.add('hidden');
+        roleFormGroup.classList.add('hidden');
+        authSubmitBtn.innerHTML = '<i data-lucide="log-in"></i> Sign In';
+        authEmail.removeAttribute('required');
+    } else {
+        authModalTitle.textContent = 'Create Account';
+        authToggleMsg.textContent = 'Already have an account?';
+        toggleAuthModeBtn.textContent = 'Sign In';
+        emailFormGroup.classList.remove('hidden');
+        roleFormGroup.classList.remove('hidden');
+        authSubmitBtn.innerHTML = '<i data-lucide="user-plus"></i> Sign Up';
+        authEmail.setAttribute('required', 'true');
+    }
+    if (window.lucide) {
+        lucide.createIcons();
+    }
+}
+
+async function handleAuthSubmit(e) {
+    e.preventDefault();
+    const username = authUsername.value.trim();
+    const password = authPassword.value;
+    const email = authEmail.value.trim();
+    const role = authRole.value;
+
+    if (authMode === 'login') {
+        try {
+            authSubmitBtn.disabled = true;
+            authSubmitBtn.innerHTML = '<div class="spinner" style="width: 18px; height: 18px; border-width: 2px;"></div> Signing In...';
+            
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || 'Login failed');
+            }
+            
+            localStorage.setItem('authUser', JSON.stringify(data));
+            authUser = data;
+            
+            updateAuthUI();
+            closeAuth();
+            showToast('Welcome back, ' + username + '!', 'success');
+        } catch (error) {
+            console.error('Login error:', error);
+            showToast(error.message || 'Login failed. Please check credentials.', 'error');
+        } finally {
+            authSubmitBtn.disabled = false;
+            authSubmitBtn.innerHTML = '<i data-lucide="log-in"></i> Sign In';
+            if (window.lucide) lucide.createIcons();
+        }
+    } else {
+        try {
+            authSubmitBtn.disabled = true;
+            authSubmitBtn.innerHTML = '<div class="spinner" style="width: 18px; height: 18px; border-width: 2px;"></div> Registering...';
+            
+            const response = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, password, role })
+            });
+            
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || 'Registration failed');
+            }
+            
+            showToast('Registration successful! Please sign in.', 'success');
+            setAuthMode('login');
+        } catch (error) {
+            console.error('Registration error:', error);
+            showToast(error.message || 'Registration failed. Please try again.', 'error');
+        } finally {
+            authSubmitBtn.disabled = false;
+            authSubmitBtn.innerHTML = '<i data-lucide="user-plus"></i> Sign Up';
+            if (window.lucide) lucide.createIcons();
+        }
+    }
+}
+
+function handleLogout() {
+    localStorage.removeItem('authUser');
+    authUser = null;
+    updateAuthUI();
+    showToast('Logged out successfully.');
 }
