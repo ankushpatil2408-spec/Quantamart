@@ -3,12 +3,13 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "scripts": {
-    "dev": "mvn spring-boot:run",
-    "build": "mvn clean compile",
-    "start": "mvn spring-boot:run",
-    "clean": "mvn clean"
+   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "clean": "vite build --clean"
   },
+
   "dependencies": {
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.1.14",
