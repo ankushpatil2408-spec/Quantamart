@@ -4,11 +4,21 @@
  */
 
 // State Management
-let products = [];
+let products = []; // Full list of products fetched from API
 let cart = []; // Array of { product: Product, quantity: Number }
-let activeCategory = 'all';
 let authUser = JSON.parse(localStorage.getItem('authUser')) || null;
 let authMode = 'login'; // 'login' or 'register'
+
+// Search and Filter State
+let currentPage = 1;
+const itemsPerPage = 6;
+let searchKeyword = '';
+let activeCategory = 'all';
+let selectedBrands = [];
+let minPrice = null;
+let maxPrice = null;
+let minRating = 0;
+let activeSort = 'featured';
 
 // DOM Elements
 const productGrid = document.getElementById('productGrid');
@@ -28,7 +38,13 @@ const closeDetailBtn = document.getElementById('closeDetailBtn');
 const detailOverlay = document.getElementById('detailOverlay');
 const detailBody = document.getElementById('detailBody');
 const toast = document.getElementById('toast');
-const filterPills = document.querySelectorAll('.filter-pill');
+
+// Search & Filter DOM Elements
+const searchInput = document.getElementById('searchInput');
+const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+const sortSelect = document.getElementById('sortSelect');
+const resultsCount = document.getElementById('resultsCount');
+const paginationControls = document.getElementById('paginationControls');
 
 // Auth DOM Elements
 const authSection = document.getElementById('authSection');
@@ -58,7 +74,7 @@ window.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
 });
 
-// Fetch products from our Spring Boot JPA endpoints
+// Fetch products from our Express endpoints
 async function fetchProducts() {
     try {
         loader.classList.remove('hidden');
@@ -83,39 +99,109 @@ async function fetchProducts() {
         console.error('Error fetching products:', error);
         loader.classList.add('hidden');
         emptyState.classList.remove('hidden');
-        showToast('Failed to connect to the Spring Boot server.', 'error');
+        showToast('Failed to connect to the Express server.', 'error');
     }
 }
 
-// Render product catalog grid with filters
+// Render product catalog grid with filters, sorting, search, and pagination
 function renderProducts() {
-    productGrid.innerHTML = '';
-    
-    const filtered = activeCategory === 'all' 
-        ? products 
-        : products.filter(p => p.category.toLowerCase() === activeCategory.toLowerCase());
+    // 1. Filtering
+    const filtered = products.filter(product => {
+        // Name / Brand / Description keyword search
+        const query = searchKeyword.toLowerCase().trim();
+        const nameMatch = !query || 
+            product.name.toLowerCase().includes(query) || 
+            (product.brand && product.brand.toLowerCase().includes(query)) ||
+            (product.description && product.description.toLowerCase().includes(query)) ||
+            product.category.toLowerCase().includes(query);
+            
+        // Category Filter
+        const categoryMatch = activeCategory === 'all' || 
+            product.category.toLowerCase() === activeCategory.toLowerCase();
+            
+        // Brand Filter (checked list)
+        const brandMatch = selectedBrands.length === 0 || 
+            (product.brand && selectedBrands.some(b => b.toLowerCase() === product.brand.toLowerCase()));
+            
+        // Price Range Filter
+        const priceMinMatch = minPrice === null || minPrice === '' || product.price >= parseFloat(minPrice);
+        const priceMaxMatch = maxPrice === null || maxPrice === '' || product.price <= parseFloat(maxPrice);
         
-    if (filtered.length === 0) {
-        productGrid.innerHTML = `
-            <div class="empty-state" style="grid-column: 1 / -1; margin: 0 auto; text-align: center;">
-                <p>No items found in this category.</p>
-            </div>
-        `;
-        return;
+        // Rating Filter (minimum rating boundary)
+        const ratingMatch = !product.rating || product.rating >= minRating;
+        
+        return nameMatch && categoryMatch && brandMatch && priceMinMatch && priceMaxMatch && ratingMatch;
+    });
+    
+    const totalFiltered = filtered.length;
+    
+    // 2. Sorting
+    if (activeSort === 'price-asc') {
+        filtered.sort((a, b) => a.price - b.price);
+    } else if (activeSort === 'price-desc') {
+        filtered.sort((a, b) => b.price - a.price);
+    } else if (activeSort === 'rating-desc') {
+        filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    } else if (activeSort === 'name-asc') {
+        filtered.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (activeSort === 'name-desc') {
+        filtered.sort((a, b) => b.name.localeCompare(a.name));
+    } else {
+        // 'featured' / default: sort by ID
+        filtered.sort((a, b) => a.id - b.id);
     }
     
-    filtered.forEach(product => {
+    // 3. Pagination bounds
+    const totalPages = Math.ceil(totalFiltered / itemsPerPage);
+    if (currentPage > totalPages) {
+        currentPage = totalPages || 1;
+    }
+    
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, totalFiltered);
+    const paginated = filtered.slice(startIndex, endIndex);
+    
+    // Update UI elements for empty state / metadata bar
+    if (totalFiltered === 0) {
+        if (resultsCount) resultsCount.textContent = 'No products match your filters';
+        productGrid.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        if (paginationControls) paginationControls.innerHTML = '';
+        return;
+    } else {
+        emptyState.classList.add('hidden');
+        if (resultsCount) {
+            resultsCount.textContent = `Showing ${startIndex + 1}–${endIndex} of ${totalFiltered} items`;
+        }
+    }
+    
+    // Render product items
+    productGrid.innerHTML = '';
+    productGrid.classList.remove('hidden');
+    
+    paginated.forEach(product => {
         const card = document.createElement('div');
         card.className = 'product-card';
         card.id = `product-card-${product.id}`;
+        
+        // Build rating stars display
+        const ratingVal = product.rating || 4.0;
+        const ratingStarsStr = "★".repeat(Math.round(ratingVal)) + "☆".repeat(5 - Math.round(ratingVal));
         
         card.innerHTML = `
             <div class="product-img-wrapper" onclick="openProductDetail(${product.id})">
                 <img class="product-img" src="${product.imageUrl}" alt="${product.name}" loading="lazy">
                 <span class="product-cat">${product.category}</span>
+                ${product.brand ? `<span class="product-brand-tag">${product.brand}</span>` : ''}
             </div>
             <div class="product-info">
-                <h3 class="product-title" onclick="openProductDetail(${product.id})">${product.name}</h3>
+                <div class="product-info-header" onclick="openProductDetail(${product.id})">
+                    <h3 class="product-title">${product.name}</h3>
+                    <div class="product-rating">
+                        <span class="stars-gold-sm">${ratingStarsStr}</span>
+                        <span class="rating-number-sm">${ratingVal.toFixed(1)}</span>
+                    </div>
+                </div>
                 <p class="product-desc">${product.description || 'No description available.'}</p>
                 <div class="product-footer">
                     <span class="product-price">$${product.price.toFixed(2)}</span>
@@ -129,9 +215,68 @@ function renderProducts() {
         productGrid.appendChild(card);
     });
     
+    // 4. Render Pagination Controls
+    renderPagination(totalPages);
+    
     // Rerender Lucide icons for dynamic items
     if (window.lucide) {
         lucide.createIcons();
+    }
+}
+
+// Render Page buttons for dynamic Pagination
+function renderPagination(totalPages) {
+    if (!paginationControls) return;
+    paginationControls.innerHTML = '';
+    if (totalPages <= 1) return;
+    
+    // Previous Button
+    const prevBtn = document.createElement('button');
+    prevBtn.className = `page-btn ${currentPage === 1 ? 'disabled' : ''}`;
+    prevBtn.innerHTML = '<i data-lucide="chevron-left" style="width: 14px; height: 14px;"></i>';
+    prevBtn.disabled = currentPage === 1;
+    prevBtn.addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            renderProducts();
+            scrollToShop();
+        }
+    });
+    paginationControls.appendChild(prevBtn);
+    
+    // Page Number Buttons
+    for (let i = 1; i <= totalPages; i++) {
+        const pageBtn = document.createElement('button');
+        pageBtn.className = `page-btn ${currentPage === i ? 'active' : ''}`;
+        pageBtn.textContent = i;
+        pageBtn.addEventListener('click', () => {
+            currentPage = i;
+            renderProducts();
+            scrollToShop();
+        });
+        paginationControls.appendChild(pageBtn);
+    }
+    
+    // Next Button
+    const nextBtn = document.createElement('button');
+    nextBtn.className = `page-btn ${currentPage === totalPages ? 'disabled' : ''}`;
+    nextBtn.innerHTML = '<i data-lucide="chevron-right" style="width: 14px; height: 14px;"></i>';
+    nextBtn.disabled = currentPage === totalPages;
+    nextBtn.addEventListener('click', () => {
+        if (currentPage < totalPages) {
+            currentPage++;
+            renderProducts();
+            scrollToShop();
+        }
+    });
+    paginationControls.appendChild(nextBtn);
+}
+
+// Smooth scroll to catalog section
+function scrollToShop() {
+    const shopSection = document.getElementById('shop');
+    if (shopSection) {
+        shopSection.scrollIntoView({ behavior: 'smooth' });
     }
 }
 
@@ -141,11 +286,20 @@ function openProductDetail(id) {
     if (!product) return;
     
     const isOutOfStock = product.stock <= 0;
+    const ratingVal = product.rating || 4.0;
+    const ratingStarsStr = "★".repeat(Math.round(ratingVal)) + "☆".repeat(5 - Math.round(ratingVal));
     
     detailBody.innerHTML = `
         <img class="detail-img" src="${product.imageUrl}" alt="${product.name}">
         <div class="detail-meta">
-            <span class="detail-category">${product.category}</span>
+            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.5rem;">
+                <span class="detail-category">${product.category}</span>
+                ${product.brand ? `<span class="detail-brand-tag" style="background-color: var(--border-dark); color: var(--text-main); font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500;">${product.brand}</span>` : ''}
+                <div class="detail-rating-stars" style="display: flex; align-items: center; gap: 0.25rem; font-size: 13px; margin-left: auto;">
+                    <span class="stars-gold-sm" style="color: #f59e0b;">${ratingStarsStr}</span>
+                    <span style="color: var(--text-muted); font-weight: 500;">(${ratingVal.toFixed(1)})</span>
+                </div>
+            </div>
             <p class="detail-desc">${product.description || 'No description available.'}</p>
             <div class="detail-stock">
                 <i data-lucide="${isOutOfStock ? 'x-circle' : 'check-circle'}" class="${isOutOfStock ? 'stock-out' : 'stock-in'}"></i>
@@ -284,11 +438,16 @@ async function handleCheckout(e) {
     const email = document.getElementById('customerEmail').value;
     const totalAmount = cart.reduce((total, item) => total + (item.product.price * item.quantity), 0);
     
+    // Get chosen payment method
+    const paymentMethodInput = document.querySelector('input[name="paymentMethod"]:checked');
+    const paymentMethod = paymentMethodInput ? paymentMethodInput.value : 'COD';
+    
     const orderData = {
         customerName,
         email,
         totalAmount,
-        status: 'PENDING'
+        paymentMethod,
+        status: paymentMethod === 'ONLINE' ? 'PAID' : 'PENDING'
     };
     
     try {
@@ -316,17 +475,49 @@ async function handleCheckout(e) {
         
         const savedOrder = await response.json();
         
-        // Success Toast & alert
+        // Success Toast & receipt modal display
         showToast(`Order #${savedOrder.id} successfully placed!`, 'success');
         
         // Reset Cart and View
         cart = [];
         updateCartUI();
         checkoutForm.reset();
+        
+        // Reset Payment Selection toggles to COD default
+        const pmCardCod = document.getElementById('pmCardCod');
+        const pmCardOnline = document.getElementById('pmCardOnline');
+        const cardDetailsSection = document.getElementById('cardDetailsSection');
+        if (pmCardCod && pmCardOnline) {
+            pmCardCod.classList.add('active');
+            pmCardOnline.classList.remove('active');
+            pmCardCod.querySelector('input').checked = true;
+            if (cardDetailsSection) cardDetailsSection.classList.add('hidden');
+        }
+        
         closeCart();
         
-        // Elegant confirmation message
-        alert(`Order Placed Successfully!\n\nThank you, ${customerName}. Your order has been registered.\nOrder ID: #${savedOrder.id}\nTotal Amount: $${totalAmount.toFixed(2)}\nStatus: ${savedOrder.status}`);
+        // Render Success Modal Receipt details
+        const paymentInfo = savedOrder.payment || {};
+        document.getElementById('receiptOrderId').textContent = `#${savedOrder.id}`;
+        document.getElementById('receiptCustomerName').textContent = savedOrder.customerName;
+        document.getElementById('receiptAmount').textContent = `$${savedOrder.totalAmount.toFixed(2)}`;
+        document.getElementById('receiptPaymentMethod').textContent = paymentInfo.paymentMethod || 'COD';
+        document.getElementById('receiptTransactionId').textContent = paymentInfo.transactionId || 'N/A';
+        
+        const receiptPaymentStatus = document.getElementById('receiptPaymentStatus');
+        if (receiptPaymentStatus) {
+            receiptPaymentStatus.textContent = paymentInfo.status || 'PENDING';
+            if (paymentInfo.status === 'COMPLETED') {
+                receiptPaymentStatus.className = 'badge success';
+            } else {
+                receiptPaymentStatus.className = 'badge pending';
+            }
+        }
+        
+        const successModal = document.getElementById('successModal');
+        if (successModal) {
+            successModal.classList.add('active');
+        }
         
     } catch (error) {
         console.error('Error placing order:', error);
@@ -336,6 +527,99 @@ async function handleCheckout(e) {
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<i data-lucide="credit-card"></i> Place Order';
         if (window.lucide) lucide.createIcons();
+    }
+}
+
+// Fetch orders and payments linked for the specific email address
+async function fetchUserOrders(email) {
+    const container = document.getElementById('ordersListContainer');
+    if (!container) return;
+
+    try {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 2.5rem 0;">
+                <div class="spinner" style="width: 24px; height: 24px; border-width: 2px; margin: 0 auto; border-color: var(--accent) transparent var(--accent) transparent;"></div>
+                <p style="margin-top: 0.75rem; font-size: 0.875rem; color: var(--text-muted);">Retrieving orders and linked transactions...</p>
+            </div>
+        `;
+
+        const response = await fetch(`/api/orders?email=${encodeURIComponent(email)}`);
+        if (!response.ok) {
+            throw new Error('Failed to retrieve orders.');
+        }
+
+        const ordersList = await response.json();
+        container.innerHTML = '';
+
+        if (ordersList.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 2.5rem 0; color: var(--text-muted);">
+                    <i data-lucide="shopping-bag" style="width: 36px; height: 36px; margin: 0 auto 0.75rem; display: block; color: var(--text-muted);"></i>
+                    <p style="font-size: 0.875rem;">No orders found for this email address.</p>
+                </div>
+            `;
+            if (window.lucide) lucide.createIcons();
+            return;
+        }
+
+        // Sort with newest orders first
+        ordersList.sort((a, b) => b.id - a.id);
+
+        ordersList.forEach(order => {
+            const card = document.createElement('div');
+            card.className = 'order-history-card';
+            
+            const payment = order.payment || {};
+            const methodBadge = payment.paymentMethod === 'ONLINE' ? 'ONLINE' : 'COD';
+            const paymentStatusBadgeClass = payment.status === 'COMPLETED' ? 'success' : 'pending';
+            const paymentStatusText = payment.status || 'PENDING';
+
+            card.innerHTML = `
+                <div class="order-history-header">
+                    <span class="order-history-title">Order #${order.id}</span>
+                    <span class="badge ${order.status === 'PAID' ? 'success' : 'pending'}">${order.status}</span>
+                </div>
+                <div class="order-history-details">
+                    <div>
+                        <span class="oh-label">Customer:</span>
+                        <span class="oh-val">${order.customerName}</span>
+                    </div>
+                    <div>
+                        <span class="oh-label">Email:</span>
+                        <span class="oh-val">${order.email}</span>
+                    </div>
+                    <div>
+                        <span class="oh-label">Total:</span>
+                        <span class="oh-val" style="color: var(--accent); font-weight: 600;">$${order.totalAmount.toFixed(2)}</span>
+                    </div>
+                    <div>
+                        <span class="oh-label">Payment Method:</span>
+                        <span class="badge" style="padding: 2px 8px; font-size: 0.7rem;">${methodBadge}</span>
+                    </div>
+                    <div style="grid-column: 1 / -1; margin-top: 0.5rem; border-top: 1px dashed var(--border-dark); padding-top: 0.5rem; display: flex; flex-direction: column; gap: 0.35rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span class="oh-label">Transaction ID:</span>
+                            <span class="code-font" style="font-size: 0.7rem;">${payment.transactionId || 'N/A'}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span class="oh-label">Payment Status:</span>
+                            <span class="badge ${paymentStatusBadgeClass}" style="padding: 2px 8px; font-size: 0.7rem;">${paymentStatusText}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+
+        if (window.lucide) lucide.createIcons();
+
+    } catch (err) {
+        console.error('Error fetching orders:', err);
+        container.innerHTML = `
+            <div style="text-align: center; padding: 2.5rem 0; color: #ef4444;">
+                <p style="font-size: 0.875rem;">Failed to load order history. Please try again.</p>
+            </div>
+        `;
     }
 }
 
@@ -395,19 +679,236 @@ function setupEventListeners() {
     });
     authForm.addEventListener('submit', handleAuthSubmit);
     
-    // Category pills filter binds
-    filterPills.forEach(pill => {
-        pill.addEventListener('click', () => {
-            filterPills.forEach(btn => btn.classList.remove('active'));
-            pill.classList.add('active');
-            activeCategory = pill.getAttribute('data-category');
+    // Search input with debounce
+    let searchTimeout;
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                searchKeyword = e.target.value;
+                currentPage = 1;
+                renderProducts();
+            }, 250);
+        });
+    }
+
+    // Category radio filters
+    const categoryFilters = document.querySelectorAll('input[name="categoryFilter"]');
+    categoryFilters.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            activeCategory = e.target.value;
+            currentPage = 1;
             renderProducts();
         });
     });
+
+    // Brand checkbox filters
+    const brandFilters = document.querySelectorAll('input[name="brandFilter"]');
+    brandFilters.forEach(cb => {
+        cb.addEventListener('change', () => {
+            selectedBrands = Array.from(brandFilters)
+                .filter(c => c.checked)
+                .map(c => c.value);
+            currentPage = 1;
+            renderProducts();
+        });
+    });
+
+    // Price range filters with debounce
+    const minPriceInput = document.getElementById('minPriceInput');
+    const maxPriceInput = document.getElementById('maxPriceInput');
+    let priceTimeout;
+    const handlePriceChange = () => {
+        clearTimeout(priceTimeout);
+        priceTimeout = setTimeout(() => {
+            minPrice = minPriceInput.value !== '' ? parseFloat(minPriceInput.value) : null;
+            maxPrice = maxPriceInput.value !== '' ? parseFloat(maxPriceInput.value) : null;
+            currentPage = 1;
+            renderProducts();
+        }, 400);
+    };
+    if (minPriceInput) minPriceInput.addEventListener('input', handlePriceChange);
+    if (maxPriceInput) maxPriceInput.addEventListener('input', handlePriceChange);
+
+    // Rating filter radios
+    const ratingFilters = document.querySelectorAll('input[name="ratingFilter"]');
+    ratingFilters.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            minRating = parseFloat(e.target.value);
+            currentPage = 1;
+            renderProducts();
+        });
+    });
+
+    // Sorting select
+    if (sortSelect) {
+        sortSelect.addEventListener('change', (e) => {
+            activeSort = e.target.value;
+            currentPage = 1;
+            renderProducts();
+        });
+    }
+
+    // Clear filters reset button
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', () => {
+            searchKeyword = '';
+            activeCategory = 'all';
+            selectedBrands = [];
+            minPrice = null;
+            maxPrice = null;
+            minRating = 0;
+            activeSort = 'featured';
+            currentPage = 1;
+            
+            // Reset input values in DOM
+            if (searchInput) searchInput.value = '';
+            if (minPriceInput) minPriceInput.value = '';
+            if (maxPriceInput) maxPriceInput.value = '';
+            if (sortSelect) sortSelect.value = 'featured';
+            
+            categoryFilters.forEach(r => r.checked = (r.value === 'all'));
+            brandFilters.forEach(cb => cb.checked = false);
+            ratingFilters.forEach(r => r.checked = (r.value === '0'));
+            
+            renderProducts();
+            showToast('All filters have been reset.');
+        });
+    }
+
+    // Payment Selection toggles
+    const pmCardCod = document.getElementById('pmCardCod');
+    const pmCardOnline = document.getElementById('pmCardOnline');
+    const cardDetailsSection = document.getElementById('cardDetailsSection');
+    const cardNumber = document.getElementById('cardNumber');
+    const cardExpiry = document.getElementById('cardExpiry');
+    const cardCvv = document.getElementById('cardCvv');
+
+    if (pmCardCod && pmCardOnline) {
+        pmCardCod.addEventListener('click', () => {
+            pmCardCod.classList.add('active');
+            pmCardOnline.classList.remove('active');
+            pmCardCod.querySelector('input').checked = true;
+            if (cardDetailsSection) cardDetailsSection.classList.add('hidden');
+            
+            if (cardNumber) cardNumber.removeAttribute('required');
+            if (cardExpiry) cardExpiry.removeAttribute('required');
+            if (cardCvv) cardCvv.removeAttribute('required');
+        });
+
+        pmCardOnline.addEventListener('click', () => {
+            pmCardOnline.classList.add('active');
+            pmCardCod.classList.remove('active');
+            pmCardOnline.querySelector('input').checked = true;
+            if (cardDetailsSection) cardDetailsSection.classList.remove('hidden');
+            
+            if (cardNumber) cardNumber.setAttribute('required', 'true');
+            if (cardExpiry) cardExpiry.setAttribute('required', 'true');
+            if (cardCvv) cardCvv.setAttribute('required', 'true');
+        });
+    }
+
+    // Success / Confirmation Modal Controls
+    const successCloseBtn = document.getElementById('successCloseBtn');
+    const successViewOrdersBtn = document.getElementById('successViewOrdersBtn');
+    const successModal = document.getElementById('successModal');
+    const successOverlay = document.getElementById('successOverlay');
+    const ordersModal = document.getElementById('ordersModal');
+
+    if (successCloseBtn) {
+        successCloseBtn.addEventListener('click', () => {
+            successModal.classList.remove('active');
+        });
+    }
+    if (successOverlay) {
+        successOverlay.addEventListener('click', () => {
+            successModal.classList.remove('active');
+        });
+    }
+    if (successViewOrdersBtn) {
+        successViewOrdersBtn.addEventListener('click', () => {
+            successModal.classList.remove('active');
+            if (ordersModal) ordersModal.classList.add('active');
+            
+            const emailInput = document.getElementById('customerEmail');
+            const lookupEmailInput = document.getElementById('lookupEmail');
+            const email = (emailInput ? emailInput.value : '') || (authUser ? authUser.email : '') || '';
+            
+            if (lookupEmailInput) {
+                lookupEmailInput.value = email;
+            }
+            if (email) {
+                fetchUserOrders(email);
+            }
+        });
+    }
+
+    // My Orders Modal Controls
+    const shopNavBtn = document.getElementById('shopNavBtn');
+    const ordersNavBtn = document.getElementById('ordersNavBtn');
+    const closeOrdersBtn = document.getElementById('closeOrdersBtn');
+    const ordersOverlay = document.getElementById('ordersOverlay');
+    const lookupOrdersBtn = document.getElementById('lookupOrdersBtn');
+    const lookupEmailInput = document.getElementById('lookupEmail');
+
+    if (shopNavBtn) {
+        shopNavBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (ordersModal) ordersModal.classList.remove('active');
+            shopNavBtn.classList.add('active');
+            if (ordersNavBtn) ordersNavBtn.classList.remove('active');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
+
+    if (ordersNavBtn && ordersModal) {
+        ordersNavBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            ordersModal.classList.add('active');
+            ordersNavBtn.classList.add('active');
+            if (shopNavBtn) shopNavBtn.classList.remove('active');
+            
+            const customerEmailInput = document.getElementById('customerEmail');
+            const email = (authUser ? authUser.email : '') || (customerEmailInput ? customerEmailInput.value : '') || '';
+            
+            if (lookupEmailInput) {
+                lookupEmailInput.value = email;
+            }
+            if (email) {
+                fetchUserOrders(email);
+            }
+        });
+    }
+    
+    function handleCloseOrders() {
+        if (ordersModal) ordersModal.classList.remove('active');
+        if (shopNavBtn) shopNavBtn.classList.add('active');
+        if (ordersNavBtn) ordersNavBtn.classList.remove('active');
+    }
+
+    if (closeOrdersBtn && ordersModal) {
+        closeOrdersBtn.addEventListener('click', handleCloseOrders);
+    }
+    if (ordersOverlay && ordersModal) {
+        ordersOverlay.addEventListener('click', handleCloseOrders);
+    }
+    if (lookupOrdersBtn && lookupEmailInput) {
+        lookupOrdersBtn.addEventListener('click', () => {
+            const email = lookupEmailInput.value.trim();
+            if (!email) {
+                showToast('Please enter an email address to search.', 'error');
+                return;
+            }
+            fetchUserOrders(email);
+        });
+    }
 }
 
 // Authentication UI & State Handlers
 function updateAuthUI() {
+    const customerNameInput = document.getElementById('customerName');
+    const customerEmailInput = document.getElementById('customerEmail');
+    
     if (authUser) {
         authSection.innerHTML = `
             <div class="auth-user-info">
@@ -417,6 +918,8 @@ function updateAuthUI() {
             </div>
         `;
         document.getElementById('authLogoutBtn').addEventListener('click', handleLogout);
+        if (customerNameInput) customerNameInput.value = authUser.username;
+        if (customerEmailInput) customerEmailInput.value = authUser.email;
     } else {
         authSection.innerHTML = `
             <button id="authOpenBtn" class="auth-btn-login">
@@ -424,6 +927,8 @@ function updateAuthUI() {
             </button>
         `;
         document.getElementById('authOpenBtn').addEventListener('click', openAuth);
+        if (customerNameInput) customerNameInput.value = '';
+        if (customerEmailInput) customerEmailInput.value = '';
     }
     
     if (window.lucide) {

@@ -22,8 +22,8 @@
                 <span class="logo-text">Quantamart</span>
             </div>
             <nav class="nav-links">
-                <a href="#" class="nav-link active">Shop</a>
-                <a href="/h2-console" target="_blank" class="nav-link console-link">H2 Console</a>
+                <a href="#" id="shopNavBtn" class="nav-link active">Shop</a>
+                <a href="#" id="ordersNavBtn" class="nav-link">My Orders</a>
                 <span id="authSection" class="auth-section"></span>
             </nav>
             <button id="cartBtn" class="cart-btn" aria-label="Open Cart">
@@ -51,34 +51,177 @@
 
     <!-- Main Container -->
     <main id="shop" class="shop-section">
-        <div class="shop-header">
-            <h2 class="section-title">The Collection</h2>
-            <!-- Filter Pills -->
-            <div class="filter-container">
-                <button class="filter-pill active" data-category="all">All Items</button>
-                <button class="filter-pill" data-category="Electronics">Electronics</button>
-                <button class="filter-pill" data-category="Bags">Bags</button>
-                <button class="filter-pill" data-category="Kitchenware">Kitchenware</button>
-                <button class="filter-pill" data-category="Apparel">Apparel</button>
-                <button class="filter-pill" data-category="Lifestyle">Lifestyle</button>
+        <div class="shop-container-layout">
+            <!-- Sidebar for filters (collapsible/responsive) -->
+            <aside class="shop-sidebar" id="shopSidebar">
+                <div class="sidebar-header">
+                    <h3>Refine Goods</h3>
+                    <button id="clearFiltersBtn" class="clear-filters-btn" aria-label="Clear all filters">
+                        <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i> Reset
+                    </button>
+                </div>
+
+                <!-- Search Input Group -->
+                <div class="filter-group">
+                    <label class="filter-group-title" for="searchInput">Search Keywords</label>
+                    <div class="search-input-wrapper">
+                        <i data-lucide="search" class="search-input-icon"></i>
+                        <input type="text" id="searchInput" placeholder="Search name, brand...">
+                    </div>
+                </div>
+
+                <!-- Category Filter -->
+                <div class="filter-group">
+                    <h4 class="filter-group-title">Category</h4>
+                    <div class="filter-options-list" id="categoryFilterList">
+                        <label class="filter-checkbox-label">
+                            <input type="radio" name="categoryFilter" value="all" checked class="custom-radio">
+                            <span>All Categories</span>
+                        </label>
+                        <label class="filter-checkbox-label">
+                            <input type="radio" name="categoryFilter" value="Electronics" class="custom-radio">
+                            <span>Electronics</span>
+                        </label>
+                        <label class="filter-checkbox-label">
+                            <input type="radio" name="categoryFilter" value="Bags" class="custom-radio">
+                            <span>Bags</span>
+                        </label>
+                        <label class="filter-checkbox-label">
+                            <input type="radio" name="categoryFilter" value="Kitchenware" class="custom-radio">
+                            <span>Kitchenware</span>
+                        </label>
+                        <label class="filter-checkbox-label">
+                            <input type="radio" name="categoryFilter" value="Apparel" class="custom-radio">
+                            <span>Apparel</span>
+                        </label>
+                        <label class="filter-checkbox-label">
+                            <input type="radio" name="categoryFilter" value="Lifestyle" class="custom-radio">
+                            <span>Lifestyle</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Brand Filter -->
+                <div class="filter-group">
+                    <h4 class="filter-group-title">Brand</h4>
+                    <div class="filter-options-list" id="brandFilterList">
+                        <label class="filter-checkbox-label">
+                            <input type="checkbox" name="brandFilter" value="Aether" class="custom-checkbox">
+                            <span>Aether</span>
+                        </label>
+                        <label class="filter-checkbox-label">
+                            <input type="checkbox" name="brandFilter" value="Soniq" class="custom-checkbox">
+                            <span>Soniq</span>
+                        </label>
+                        <label class="filter-checkbox-label">
+                            <input type="checkbox" name="brandFilter" value="Terra" class="custom-checkbox">
+                            <span>Terra</span>
+                        </label>
+                        <label class="filter-checkbox-label">
+                            <input type="checkbox" name="brandFilter" value="Keychronic" class="custom-checkbox">
+                            <span>Keychronic</span>
+                        </label>
+                        <label class="filter-checkbox-label">
+                            <input type="checkbox" name="brandFilter" value="Ethos" class="custom-checkbox">
+                            <span>Ethos</span>
+                        </label>
+                        <label class="filter-checkbox-label">
+                            <input type="checkbox" name="brandFilter" value="HydroPeak" class="custom-checkbox">
+                            <span>HydroPeak</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Price Range Filter -->
+                <div class="filter-group">
+                    <h4 class="filter-group-title">Price Range</h4>
+                    <div class="price-range-inputs">
+                        <div class="price-input-box">
+                            <span class="price-currency">$</span>
+                            <input type="number" id="minPriceInput" placeholder="Min" min="0">
+                        </div>
+                        <span class="price-range-dash">—</span>
+                        <div class="price-input-box">
+                            <span class="price-currency">$</span>
+                            <input type="number" id="maxPriceInput" placeholder="Max" min="0">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rating Filter -->
+                <div class="filter-group">
+                    <h4 class="filter-group-title">Minimum Rating</h4>
+                    <div class="rating-filter-options">
+                        <label class="rating-radio-label">
+                            <input type="radio" name="ratingFilter" value="0" checked class="custom-radio">
+                            <span>Any Rating</span>
+                        </label>
+                        <label class="rating-radio-label">
+                            <input type="radio" name="ratingFilter" value="4.5" class="custom-radio">
+                            <span class="stars-display">
+                                <span class="stars-gold">★★★★★</span> 4.5 &amp; Up
+                            </span>
+                        </label>
+                        <label class="rating-radio-label">
+                            <input type="radio" name="ratingFilter" value="4.2" class="custom-radio">
+                            <span class="stars-display">
+                                <span class="stars-gold">★★★★☆</span> 4.2 &amp; Up
+                            </span>
+                        </label>
+                        <label class="rating-radio-label">
+                            <input type="radio" name="ratingFilter" value="4.0" class="custom-radio">
+                            <span class="stars-display">
+                                <span class="stars-gold">★★★★☆</span> 4.0 &amp; Up
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Shop Catalog Section -->
+            <div class="shop-catalog">
+                <!-- Topbar for Sorting and Status -->
+                <div class="shop-catalog-topbar">
+                    <div class="catalog-info">
+                        <h2 class="section-title">The Collection</h2>
+                        <span id="resultsCount" class="results-count">Showing 0 of 0 items</span>
+                    </div>
+                    
+                    <div class="sort-control">
+                        <label for="sortSelect">Sort By</label>
+                        <select id="sortSelect" class="sort-dropdown">
+                            <option value="featured">Featured</option>
+                            <option value="price-asc">Price: Low to High</option>
+                            <option value="price-desc">Price: High to Low</option>
+                            <option value="rating-desc">Rating: Highest First</option>
+                            <option value="name-asc">Name: A-Z</option>
+                            <option value="name-desc">Name: Z-A</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Loader -->
+                <div id="loader" class="loader-container">
+                    <div class="spinner"></div>
+                    <p>Fetching goods from our backend database...</p>
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptyState" class="empty-state hidden">
+                    <i data-lucide="alert-circle" class="empty-icon"></i>
+                    <h3>No Products Found</h3>
+                    <p>No products match your filters. Try clearing some constraints or adjusting search terms.</p>
+                </div>
+
+                <!-- Product Grid -->
+                <div id="productGrid" class="product-grid"></div>
+
+                <!-- Pagination Controls -->
+                <div id="paginationControls" class="pagination-controls">
+                    <!-- Dynamic buttons -->
+                </div>
             </div>
         </div>
-
-        <!-- Loader -->
-        <div id="loader" class="loader-container">
-            <div class="spinner"></div>
-            <p>Fetching goods from our backend database...</p>
-        </div>
-
-        <!-- Empty State -->
-        <div id="emptyState" class="empty-state hidden">
-            <i data-lucide="alert-circle" class="empty-icon"></i>
-            <h3>No Products Found</h3>
-            <p>Could not load the catalog from the Spring Boot server. Please check your connection or rebuild the database.</p>
-        </div>
-
-        <!-- Product Grid -->
-        <div id="productGrid" class="product-grid"></div>
     </main>
 
     <!-- Footer -->
@@ -86,16 +229,16 @@
         <div class="footer-container">
             <div class="footer-left">
                 <p>&copy; 2026 Quantamart Essentials, Inc. All rights reserved.</p>
-                <p class="footer-meta">Powered by Spring Boot 3.2, H2 Database, JPA, and Vanilla JavaScript.</p>
+                <p class="footer-meta">Powered by Node.js, Express, and Vanilla JavaScript.</p>
             </div>
             <div class="footer-right">
                 <div class="status-indicator">
                     <span class="status-dot"></span>
-                    <span>H2 Database Connected</span>
+                    <span>Memory Storage Active</span>
                 </div>
                 <div class="status-indicator">
                     <span class="status-dot"></span>
-                    <span>Spring Boot v3.2.0</span>
+                    <span>Express Server v4.21.2</span>
                 </div>
             </div>
         </div>
@@ -145,7 +288,50 @@
                         <label for="customerEmail">Email Address</label>
                         <input type="email" id="customerEmail" required placeholder="john@example.com">
                     </div>
-                    <button type="submit" class="submit-order-btn">
+
+                    <h3 style="margin-top: 1.5rem; margin-bottom: 0.75rem;">Payment Method</h3>
+                    <div class="payment-methods-grid">
+                        <label class="payment-method-card active" id="pmCardCod">
+                            <input type="radio" name="paymentMethod" value="COD" checked class="hidden-radio">
+                            <div class="pm-card-content">
+                                <i data-lucide="truck" class="pm-icon"></i>
+                                <div class="pm-info">
+                                    <span class="pm-title">Cash On Delivery</span>
+                                    <span class="pm-desc">Pay with cash upon delivery</span>
+                                </div>
+                            </div>
+                        </label>
+                        <label class="payment-method-card" id="pmCardOnline">
+                            <input type="radio" name="paymentMethod" value="ONLINE" class="hidden-radio">
+                            <div class="pm-card-content">
+                                <i data-lucide="credit-card" class="pm-icon"></i>
+                                <div class="pm-info">
+                                    <span class="pm-title">Online Payment</span>
+                                    <span class="pm-desc">Instant payment via Card</span>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Card Details Section (conditionally visible) -->
+                    <div id="cardDetailsSection" class="card-details-section hidden">
+                        <div class="form-group">
+                            <label for="cardNumber">Card Number</label>
+                            <input type="text" id="cardNumber" placeholder="4111 2222 3333 4444" pattern="[0-9\s]{13,19}">
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div class="form-group">
+                                <label for="cardExpiry">Expiration Date</label>
+                                <input type="text" id="cardExpiry" placeholder="MM/YY">
+                            </div>
+                            <div class="form-group">
+                                <label for="cardCvv">CVV</label>
+                                <input type="password" id="cardCvv" placeholder="123" maxlength="4">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="submit-order-btn" style="margin-top: 1.5rem;">
                         <i data-lucide="credit-card"></i> Place Order
                     </button>
                 </form>
@@ -226,6 +412,81 @@
             </div>
             <div class="modal-body detail-body" id="detailBody">
                 <!-- Populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Orders Modal -->
+    <div id="ordersModal" class="modal detail-modal">
+        <div class="modal-overlay" id="ordersOverlay"></div>
+        <div class="modal-content detail-content orders-modal-content">
+            <div class="modal-header">
+                <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                    <i data-lucide="shopping-bag"></i> My Orders & Payments
+                </h2>
+                <button id="closeOrdersBtn" class="close-btn" aria-label="Close Orders">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="ordersEmailLookup" class="orders-lookup-bar">
+                    <p class="lookup-info">Enter your email to search your order and payment history:</p>
+                    <div class="lookup-input-group">
+                        <input type="email" id="lookupEmail" placeholder="you@example.com">
+                        <button id="lookupOrdersBtn" class="lookup-btn">Find Orders</button>
+                    </div>
+                </div>
+                
+                <div id="ordersListContainer" class="orders-list-container">
+                    <!-- Dynamic Orders and Payment Information -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Success / Confirmation Modal -->
+    <div id="successModal" class="modal detail-modal">
+        <div class="modal-overlay" id="successOverlay"></div>
+        <div class="modal-content detail-content success-modal-content">
+            <div class="modal-body" style="text-align: center; padding: 2rem 1rem;">
+                <div class="success-icon-container">
+                    <i data-lucide="check-circle" class="success-icon-large" style="width: 64px; height: 64px; color: var(--success); margin: 0 auto;"></i>
+                </div>
+                <h2 style="font-family: var(--font-display); font-size: 1.75rem; margin-top: 1rem; margin-bottom: 0.5rem; font-weight: 700;">Order Placed Successfully!</h2>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem;">Thank you for your purchase. Your payment record has been linked and logged.</p>
+                
+                <div class="receipt-card">
+                    <div class="receipt-row">
+                        <span>Order ID:</span>
+                        <strong id="receiptOrderId">#1</strong>
+                    </div>
+                    <div class="receipt-row">
+                        <span>Customer Name:</span>
+                        <span id="receiptCustomerName">John Doe</span>
+                    </div>
+                    <div class="receipt-row">
+                        <span>Total Amount:</span>
+                        <strong id="receiptAmount" class="receipt-total-highlight">$120.00</strong>
+                    </div>
+                    <div class="receipt-divider"></div>
+                    <div class="receipt-row">
+                        <span>Payment Method:</span>
+                        <span id="receiptPaymentMethod" class="badge">ONLINE</span>
+                    </div>
+                    <div class="receipt-row">
+                        <span>Transaction ID:</span>
+                        <span id="receiptTransactionId" class="code-font">TXN-ABC123XYZ</span>
+                    </div>
+                    <div class="receipt-row">
+                        <span>Payment Status:</span>
+                        <span id="receiptPaymentStatus" class="badge success">COMPLETED</span>
+                    </div>
+                </div>
+
+                <div style="margin-top: 2rem; display: flex; gap: 1rem; justify-content: center;">
+                    <button id="successCloseBtn" class="btn btn-secondary">Continue Shopping</button>
+                    <button id="successViewOrdersBtn" class="btn btn-accent">View My Orders</button>
+                </div>
             </div>
         </div>
     </div>
