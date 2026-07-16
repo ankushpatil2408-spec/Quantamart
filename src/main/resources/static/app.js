@@ -9,6 +9,37 @@ let cart = []; // Array of { product: Product, quantity: Number }
 let authUser = JSON.parse(localStorage.getItem('authUser')) || null;
 let authMode = 'login'; // 'login' or 'register'
 
+// Theme Management State & Helpers
+let currentTheme = localStorage.getItem('theme') || 'light';
+
+function initTheme() {
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    updateThemeIcon();
+}
+
+function toggleTheme() {
+    currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+    localStorage.setItem('theme', currentTheme);
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    updateThemeIcon();
+    showToast(`Switched to ${currentTheme} mode.`, 'success');
+}
+
+function updateThemeIcon() {
+    const btn = document.getElementById('themeToggleBtn');
+    if (!btn) return;
+    
+    if (currentTheme === 'dark') {
+        btn.innerHTML = '<i data-lucide="sun"></i>';
+    } else {
+        btn.innerHTML = '<i data-lucide="moon"></i>';
+    }
+    
+    if (window.lucide) {
+        lucide.createIcons();
+    }
+}
+
 // Search and Filter State
 let currentPage = 1;
 const itemsPerPage = 6;
@@ -69,6 +100,7 @@ const ORDERS_API = '/api/orders';
 
 // Initialize on Load
 window.addEventListener('DOMContentLoaded', () => {
+    initTheme();
     fetchProducts();
     updateAuthUI();
     setupEventListeners();
@@ -319,6 +351,93 @@ function openProductDetail(id) {
     
     if (window.lucide) {
         lucide.createIcons();
+    }
+    
+    // Fetch and display AI Product Recommendations
+    fetchAIRecommendations(product.id);
+}
+
+// Fetch and Render AI Product Recommendations
+async function fetchAIRecommendations(productId) {
+    const section = document.getElementById('aiRecommendationsSection');
+    if (!section) return;
+
+    // Render loading skeletons
+    section.innerHTML = `
+        <div class="ai-recommendations-header">
+            <span class="ai-recommendations-spark">
+                <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
+            </span>
+            <h3 style="font-family: var(--font-display); font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin: 0;">AI Smart Recommendations</h3>
+            <span class="ai-recommendations-badge">Gemini Powered</span>
+        </div>
+        <div class="ai-recommendations-grid">
+            <div class="ai-rec-shimmer"></div>
+            <div class="ai-rec-shimmer"></div>
+            <div class="ai-rec-shimmer"></div>
+        </div>
+    `;
+    if (window.lucide) {
+        lucide.createIcons();
+    }
+
+    try {
+        const cartProductIds = cart.map(item => item.product.id);
+        
+        const response = await fetch('/api/ai/recommendations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                currentProductId: productId,
+                cartProductIds
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Recommendations fetch failed');
+        }
+
+        const data = await response.json();
+        const recommendations = data.recommendations || [];
+
+        if (recommendations.length === 0) {
+            section.innerHTML = '';
+            return;
+        }
+
+        let gridHtml = '';
+        recommendations.forEach(rec => {
+            gridHtml += `
+                <div class="ai-rec-card" onclick="event.stopPropagation(); openProductDetail(${rec.id});">
+                    <img class="ai-rec-img" src="${rec.imageUrl}" alt="${rec.name}">
+                    <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                        <h4 class="ai-rec-title" title="${rec.name}">${rec.name}</h4>
+                        <div class="ai-rec-price">$${rec.price.toFixed(2)}</div>
+                    </div>
+                    <p class="ai-rec-reason">${rec.reason}</p>
+                </div>
+            `;
+        });
+
+        section.innerHTML = `
+            <div class="ai-recommendations-header">
+                <span class="ai-recommendations-spark">
+                    <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
+                </span>
+                <h3 style="font-family: var(--font-display); font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin: 0;">AI Smart Recommendations</h3>
+                <span class="ai-recommendations-badge">Gemini Powered</span>
+            </div>
+            <div class="ai-recommendations-grid">
+                ${gridHtml}
+            </div>
+        `;
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+
+    } catch (err) {
+        console.error('Error loading AI recommendations:', err);
+        section.innerHTML = ''; // Hide section quietly on error
     }
 }
 
@@ -582,11 +701,62 @@ async function fetchUserOrders(email) {
                 statusClass = 'accent-badge'; // Wait, let's use standard or simple colors
             }
 
+            // Calculate progress steps dynamically
+            const statusSteps = ['PENDING', 'PAID', 'SHIPPED', 'IN_TRANSIT', 'DELIVERED'];
+            const currentStepIndex = statusSteps.indexOf(order.status);
+            const progressPercent = currentStepIndex >= 0 ? (currentStepIndex / (statusSteps.length - 1)) * 100 : 0;
+
+            const stepsData = [
+                { label: 'Placed', icon: 'file-text' },
+                { label: 'Paid', icon: 'check-circle' },
+                { label: 'Shipped', icon: 'package' },
+                { label: 'In Transit', icon: 'truck' },
+                { label: 'Delivered', icon: 'home' }
+            ];
+
+            let stepsHtml = '';
+            stepsData.forEach((step, idx) => {
+                let stepClass = '';
+                let iconHtml = '';
+                
+                if (idx < currentStepIndex) {
+                    stepClass = 'completed';
+                    iconHtml = '<i data-lucide="check" style="width: 12px; height: 12px;"></i>';
+                } else if (idx === currentStepIndex) {
+                    stepClass = 'active';
+                    iconHtml = `<i data-lucide="${step.icon}" style="width: 12px; height: 12px;"></i>`;
+                } else {
+                    stepClass = '';
+                    iconHtml = `<i data-lucide="${step.icon}" style="width: 12px; height: 12px; opacity: 0.65;"></i>`;
+                }
+                
+                stepsHtml += `
+                    <div class="progress-step ${stepClass}">
+                        <div class="step-circle">
+                            ${iconHtml}
+                        </div>
+                        <span class="step-label">${step.label}</span>
+                    </div>
+                `;
+            });
+
             card.innerHTML = `
                 <div class="order-history-header">
                     <span class="order-history-title">Order #${order.id}</span>
                     <span class="badge ${statusClass}">${order.status}</span>
                 </div>
+                
+                <!-- Visual Order Progress Bar -->
+                <div class="order-progress-wrapper">
+                    <div class="order-progress-title-compact">
+                        <i data-lucide="activity" style="width: 14px; height: 14px;"></i> Delivery Status Tracker
+                    </div>
+                    <div class="order-progress-bar">
+                        <div class="order-progress-line" style="width: calc(${progressPercent}% - 20px); max-width: 100%; min-width: 0%;"></div>
+                        ${stepsHtml}
+                    </div>
+                </div>
+
                 <div class="order-history-details">
                     <div>
                         <span class="oh-label">Customer:</span>
@@ -681,6 +851,12 @@ function showToast(message, type = 'success') {
 
 // Bind DOM event listeners
 function setupEventListeners() {
+    // Theme Toggle Handler
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener('click', toggleTheme);
+    }
+
     // Open / Close Cart Sidebar
     cartBtn.addEventListener('click', openCart);
     closeCartBtn.addEventListener('click', closeCart);

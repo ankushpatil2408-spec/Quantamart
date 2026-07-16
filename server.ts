@@ -735,6 +735,140 @@ app.put("/api/orders/:id/status", (req, res) => {
 });
 
 // ==========================================================================
+// AI Product Recommendations Engine
+// ==========================================================================
+app.post("/api/ai/recommendations", async (req, res) => {
+  const { currentProductId, cartProductIds, orderHistoryProductIds } = req.body;
+  if (!currentProductId) {
+    return res.status(400).json({ error: "Missing currentProductId" });
+  }
+
+  try {
+    const ai = getGeminiClient();
+
+    // Find the current product being viewed
+    const currentProduct = products.find(p => p.id === parseInt(currentProductId));
+    if (!currentProduct) {
+      return res.status(404).json({ error: "Current product not found in catalog" });
+    }
+
+    // Get cart products
+    const cartProducts = (cartProductIds || []).map((id: any) => products.find(p => p.id === parseInt(id))).filter(Boolean);
+    
+    // Get ordered products
+    const orderedProducts = (orderHistoryProductIds || []).map((id: any) => products.find(p => p.id === parseInt(id))).filter(Boolean);
+
+    // Prompt instructions for Gemini
+    const systemInstruction = `You are the "Quantamart AI Product Recommendation Engine", a high-end personal styling and product matchmaking helper.
+Your goal is to recommend exactly 3 products from the available catalog that go beautifully with the product the user is currently viewing (the "Target Product").
+
+Use the user's current shopping cart or purchase history (if provided) to personalize the matches.
+For example, if the Target Product is a coffee mug and they have a coffeemaker in their cart, explain how they make a pristine kitchen set. If the Target Product is a hoodie, you could recommend a cotton tee or backpack.
+
+AVAILABLE CATALOG:
+${JSON.stringify(products, null, 2)}
+
+STRICT CONSTRAINTS:
+1. Do NOT recommend the Target Product itself.
+2. Select EXACTLY 3 products from the available catalog.
+3. For each recommended product, write a single concise, engaging, and professional sentence explaining exactly WHY this product complements or pairs beautifully with the Target Product (e.g., "Pair this minimalist leather backpack with our organic cotton hoodie for a clean, sustainable everyday look").
+4. ALWAYS respond strictly in the JSON format matching the schema provided.`;
+
+    const contents = `
+Target Product: ${JSON.stringify(currentProduct)}
+User's Cart Products: ${JSON.stringify(cartProducts)}
+User's Purchase History: ${JSON.stringify(orderedProducts)}
+
+Please recommend 3 products.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents,
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            recommendations: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  productId: {
+                    type: Type.INTEGER,
+                    description: "The exact integer ID of the recommended product."
+                  },
+                  reason: {
+                    type: Type.STRING,
+                    description: "A single, highly personalized, beautiful matchmaking sentence."
+                  }
+                },
+                required: ["productId", "reason"]
+              }
+            }
+          },
+          required: ["recommendations"]
+        }
+      }
+    });
+
+    const responseText = response.text;
+    if (!responseText) {
+      throw new Error("No response text from Gemini API");
+    }
+
+    const parsed = JSON.parse(responseText.trim());
+    
+    // Enrich recommendations with full product detail
+    const enrichedRecommendations = parsed.recommendations.map((rec: any) => {
+      const prod = products.find(p => p.id === rec.productId);
+      if (prod) {
+        return {
+          ...prod,
+          reason: rec.reason
+        };
+      }
+      return null;
+    }).filter(Boolean);
+
+    // Fallback if less than 3 products returned or invalid IDs
+    if (enrichedRecommendations.length < 3) {
+      const existingIds = enrichedRecommendations.map((r: any) => r.id);
+      const remainingFallbacks = products
+        .filter(p => p.id !== currentProduct.id && !existingIds.includes(p.id))
+        .sort((a, b) => b.rating - a.rating); // high rating first
+
+      while (enrichedRecommendations.length < 3 && remainingFallbacks.length > 0) {
+        const p = remainingFallbacks.shift();
+        if (p) {
+          enrichedRecommendations.push({
+            ...p,
+            reason: `A highly-rated favorite from our ${p.category} collection that matches the style.`
+          });
+        }
+      }
+    }
+
+    res.json({ recommendations: enrichedRecommendations.slice(0, 3) });
+
+  } catch (error: any) {
+    console.error("AI Recommendation Error:", error);
+    // Bulletproof heuristic fallback in case of rate limits or empty/bad keys
+    const currentProduct = products.find(p => p.id === parseInt(currentProductId));
+    const fallbacks = products
+      .filter(p => !currentProduct || p.id !== currentProduct.id)
+      .sort((a, b) => (currentProduct && p.category === currentProduct.category ? -1 : 1)) // favor same category
+      .slice(0, 3)
+      .map(p => ({
+        ...p,
+        reason: `Popular choice in our ${p.category} department that other style-conscious customers bought.`
+      }));
+    res.json({ recommendations: fallbacks });
+  }
+});
+
+// ==========================================================================
 // AI Shopping Assistant endpoints
 // ==========================================================================
 

@@ -29,11 +29,16 @@
                 </a>
                 <span id="authSection" class="auth-section"></span>
             </nav>
-            <button id="cartBtn" class="cart-btn" aria-label="Open Cart">
-                <i data-lucide="shopping-bag"></i>
-                <span class="cart-text">Cart</span>
-                <span id="cartCount" class="cart-badge">0</span>
-            </button>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <button id="themeToggleBtn" class="theme-toggle-btn" aria-label="Toggle Theme">
+                    <i data-lucide="moon"></i>
+                </button>
+                <button id="cartBtn" class="cart-btn" aria-label="Open Cart">
+                    <i data-lucide="shopping-bag"></i>
+                    <span class="cart-text">Cart</span>
+                    <span id="cartCount" class="cart-badge">0</span>
+                </button>
+            </div>
         </div>
     </header>
 
@@ -410,15 +415,21 @@
     <!-- Product Detail Modal -->
     <div id="detailModal" class="modal detail-modal">
         <div class="modal-overlay" id="detailOverlay"></div>
-        <div class="modal-content detail-content">
+        <div class="modal-content detail-content" style="max-height: 90vh; display: flex; flex-direction: column;">
             <div class="modal-header">
                 <h2 id="detailTitle">Product Details</h2>
                 <button id="closeDetailBtn" class="close-btn">
                     <i data-lucide="x"></i>
                 </button>
             </div>
-            <div class="modal-body detail-body" id="detailBody">
-                <!-- Populated dynamically -->
+            <div class="modal-body" style="flex: 1; overflow-y: auto; padding: 0;">
+                <div class="detail-body" id="detailBody">
+                    <!-- Populated dynamically -->
+                </div>
+                <!-- AI Product Recommendations Section -->
+                <div id="aiRecommendationsSection" class="ai-recommendations-section">
+                    <!-- Populated dynamically -->
+                </div>
             </div>
         </div>
     </div>
