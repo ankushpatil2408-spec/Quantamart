@@ -1049,22 +1049,168 @@ function setupEventListeners() {
     const lookupOrdersBtn = document.getElementById('lookupOrdersBtn');
     const lookupEmailInput = document.getElementById('lookupEmail');
 
+    // Nav links references
+    const homeNavBtn = document.getElementById('homeNavBtn');
+    const aboutNavBtn = document.getElementById('aboutNavBtn');
+    const contactNavBtn = document.getElementById('contactNavBtn');
+
+    // Custom Modals references
+    const aboutModal = document.getElementById('aboutModal');
+    const aboutOverlay = document.getElementById('aboutOverlay');
+    const closeAboutBtn = document.getElementById('closeAboutBtn');
+
+    const contactModal = document.getElementById('contactModal');
+    const contactOverlay = document.getElementById('contactOverlay');
+    const closeContactBtn = document.getElementById('closeContactBtn');
+    const contactForm = document.getElementById('contactForm');
+
+    // Helper to update active navigation links classes
+    function setActiveNav(activeBtn) {
+        [homeNavBtn, shopNavBtn, aboutNavBtn, contactNavBtn, ordersNavBtn].forEach(btn => {
+            if (btn) btn.classList.remove('active');
+        });
+        if (activeBtn) activeBtn.classList.add('active');
+    }
+
+    // Helper to close all custom and default navigation modals
+    function closeAllNavModals() {
+        if (ordersModal) ordersModal.classList.remove('active');
+        if (aboutModal) aboutModal.classList.remove('active');
+        if (contactModal) contactModal.classList.remove('active');
+    }
+
+    if (homeNavBtn) {
+        homeNavBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeAllNavModals();
+            setActiveNav(homeNavBtn);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
+
     if (shopNavBtn) {
         shopNavBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            if (ordersModal) ordersModal.classList.remove('active');
-            shopNavBtn.classList.add('active');
-            if (ordersNavBtn) ordersNavBtn.classList.remove('active');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            closeAllNavModals();
+            setActiveNav(shopNavBtn);
+            const shopSection = document.getElementById('shop');
+            if (shopSection) {
+                shopSection.scrollIntoView({ behavior: 'smooth' });
+            } else {
+                window.scrollTo({ top: 400, behavior: 'smooth' });
+            }
+        });
+    }
+
+    if (aboutNavBtn && aboutModal) {
+        aboutNavBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeAllNavModals();
+            aboutModal.classList.add('active');
+            setActiveNav(aboutNavBtn);
+        });
+    }
+
+    if (closeAboutBtn) {
+        closeAboutBtn.addEventListener('click', () => {
+            if (aboutModal) aboutModal.classList.remove('active');
+            setActiveNav(window.scrollY < 200 ? homeNavBtn : shopNavBtn);
+        });
+    }
+    if (aboutOverlay) {
+        aboutOverlay.addEventListener('click', () => {
+            if (aboutModal) aboutModal.classList.remove('active');
+            setActiveNav(window.scrollY < 200 ? homeNavBtn : shopNavBtn);
+        });
+    }
+
+    if (contactNavBtn && contactModal) {
+        contactNavBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeAllNavModals();
+            contactModal.classList.add('active');
+            setActiveNav(contactNavBtn);
+            
+            // Pre-populate if logged in
+            const contactName = document.getElementById('contactName');
+            const contactEmail = document.getElementById('contactEmail');
+            if (authUser) {
+                if (contactName && !contactName.value) contactName.value = authUser.username;
+                if (contactEmail && !contactEmail.value) contactEmail.value = authUser.email;
+            }
+        });
+    }
+
+    if (closeContactBtn) {
+        closeContactBtn.addEventListener('click', () => {
+            if (contactModal) contactModal.classList.remove('active');
+            setActiveNav(window.scrollY < 200 ? homeNavBtn : shopNavBtn);
+        });
+    }
+    if (contactOverlay) {
+        contactOverlay.addEventListener('click', () => {
+            if (contactModal) contactModal.classList.remove('active');
+            setActiveNav(window.scrollY < 200 ? homeNavBtn : shopNavBtn);
+        });
+    }
+
+    if (contactForm && contactModal) {
+        contactForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('contactName').value;
+            const email = document.getElementById('contactEmail').value;
+            const subject = document.getElementById('contactSubject').value;
+            const message = document.getElementById('contactMessage').value;
+
+            try {
+                const submitBtn = contactForm.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<div class="spinner" style="width: 18px; height: 18px; border-width: 2px;"></div> Sending...';
+
+                const response = await fetch('/api/contact', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, subject, message })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to send inquiry.');
+                }
+
+                const resData = await response.json();
+                contactForm.reset();
+                contactModal.classList.remove('active');
+                setActiveNav(window.scrollY < 200 ? homeNavBtn : shopNavBtn);
+                
+                showToast(`Inquiry sent! Ref: ${resData.reference}`, 'success');
+
+                // Auto open emails hub to show simulation
+                setTimeout(() => {
+                    const notificationsNavBtn = document.getElementById('notificationsNavBtn');
+                    if (notificationsNavBtn) {
+                        notificationsNavBtn.click();
+                        const contactPill = document.querySelector('.filter-pills button[data-filter="CONTACT_FORM"]');
+                        if (contactPill) contactPill.click();
+                    }
+                }, 1200);
+            } catch (err) {
+                console.error(err);
+                showToast('Failed to send message. Please try again.', 'error');
+            } finally {
+                const submitBtn = contactForm.querySelector('button[type="submit"]');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i data-lucide="send"></i> Send Inquiry';
+                if (window.lucide) lucide.createIcons();
+            }
         });
     }
 
     if (ordersNavBtn && ordersModal) {
         ordersNavBtn.addEventListener('click', (e) => {
             e.preventDefault();
+            closeAllNavModals();
             ordersModal.classList.add('active');
-            ordersNavBtn.classList.add('active');
-            if (shopNavBtn) shopNavBtn.classList.remove('active');
+            setActiveNav(ordersNavBtn);
             
             const customerEmailInput = document.getElementById('customerEmail');
             const email = (authUser ? authUser.email : '') || (customerEmailInput ? customerEmailInput.value : '') || '';
@@ -1080,8 +1226,7 @@ function setupEventListeners() {
     
     function handleCloseOrders() {
         if (ordersModal) ordersModal.classList.remove('active');
-        if (shopNavBtn) shopNavBtn.classList.add('active');
-        if (ordersNavBtn) ordersNavBtn.classList.remove('active');
+        setActiveNav(window.scrollY < 200 ? homeNavBtn : shopNavBtn);
     }
 
     if (closeOrdersBtn && ordersModal) {
@@ -1109,13 +1254,109 @@ function updateAuthUI() {
     
     if (authUser) {
         authSection.innerHTML = `
-            <div class="auth-user-info">
-                <span>Hi, <strong>${authUser.username}</strong></span>
-                <span class="auth-user-badge">${authUser.role}</span>
-                <button id="authLogoutBtn" class="auth-btn-logout">Logout</button>
+            <div class="profile-dropdown">
+                <button id="profileDropdownBtn" class="profile-trigger-btn" aria-label="User Profile" aria-haspopup="true" aria-expanded="false">
+                    <div class="profile-avatar">
+                        ${authUser.username.charAt(0).toUpperCase()}
+                    </div>
+                    <div class="profile-meta">
+                        <span class="profile-hi">Hi, ${authUser.username}</span>
+                        <span class="profile-role">${authUser.role}</span>
+                    </div>
+                    <i data-lucide="chevron-down" class="profile-chevron"></i>
+                </button>
+                <div id="profileDropdownMenu" class="profile-dropdown-menu">
+                    <div class="profile-menu-header">
+                        <div class="profile-menu-avatar-large">
+                            ${authUser.username.charAt(0).toUpperCase()}
+                        </div>
+                        <div class="profile-menu-info">
+                            <span class="profile-menu-name">${authUser.username}</span>
+                            <span class="profile-menu-role-badge">${authUser.role}</span>
+                        </div>
+                    </div>
+                    <div class="profile-menu-items">
+                        <button class="profile-menu-item" id="menuShopBtn">
+                            <i data-lucide="shopping-bag" style="width: 14px; height: 14px;"></i>
+                            <span>Shop Products</span>
+                        </button>
+                        <button class="profile-menu-item" id="menuOrdersBtn">
+                            <i data-lucide="package" style="width: 14px; height: 14px;"></i>
+                            <span>My Orders</span>
+                        </button>
+                        <button class="profile-menu-item" id="menuNotificationsBtn">
+                            <i data-lucide="mail" style="width: 14px; height: 14px;"></i>
+                            <span>Emails Hub</span>
+                        </button>
+                        <div class="profile-menu-divider"></div>
+                        <button class="profile-menu-item logout-item" id="authLogoutBtn">
+                            <i data-lucide="log-out" style="width: 14px; height: 14px;"></i>
+                            <span>Sign Out</span>
+                        </button>
+                    </div>
+                </div>
             </div>
         `;
+        
+        // Logout handler
         document.getElementById('authLogoutBtn').addEventListener('click', handleLogout);
+        
+        // Navigation links within the dropdown
+        document.getElementById('menuShopBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            const shopNavBtn = document.getElementById('shopNavBtn');
+            if (shopNavBtn) shopNavBtn.click();
+            closeProfileDropdown();
+        });
+        
+        document.getElementById('menuOrdersBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            const ordersNavBtn = document.getElementById('ordersNavBtn');
+            if (ordersNavBtn) ordersNavBtn.click();
+            closeProfileDropdown();
+        });
+        
+        document.getElementById('menuNotificationsBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            const notificationsNavBtn = document.getElementById('notificationsNavBtn');
+            if (notificationsNavBtn) notificationsNavBtn.click();
+            closeProfileDropdown();
+        });
+
+        // Dropdown toggle logic
+        const btn = document.getElementById('profileDropdownBtn');
+        const menu = document.getElementById('profileDropdownMenu');
+        
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isActive = menu.classList.contains('active');
+            closeAllDropdowns(); // helper if other dropdowns exist
+            if (!isActive) {
+                menu.classList.add('active');
+                btn.setAttribute('aria-expanded', 'true');
+            }
+        });
+
+        // Close dropdown helper
+        function closeProfileDropdown() {
+            if (menu) {
+                menu.classList.remove('active');
+                btn.setAttribute('aria-expanded', 'false');
+            }
+        }
+
+        // Global click-away handler
+        function handleOutsideClick(event) {
+            if (menu && menu.classList.contains('active')) {
+                if (!btn.contains(event.target) && !menu.contains(event.target)) {
+                    closeProfileDropdown();
+                }
+            }
+        }
+
+        document.removeEventListener('click', handleOutsideClick);
+        document.addEventListener('click', handleOutsideClick);
+
         if (customerNameInput) customerNameInput.value = authUser.username;
         if (customerEmailInput) customerEmailInput.value = authUser.email;
     } else {
@@ -1127,6 +1368,14 @@ function updateAuthUI() {
         document.getElementById('authOpenBtn').addEventListener('click', openAuth);
         if (customerNameInput) customerNameInput.value = '';
         if (customerEmailInput) customerEmailInput.value = '';
+    }
+    
+    // Auxiliary helper to close all dropdowns
+    function closeAllDropdowns() {
+        const menus = document.querySelectorAll('.profile-dropdown-menu');
+        menus.forEach(m => m.classList.remove('active'));
+        const triggers = document.querySelectorAll('.profile-trigger-btn');
+        triggers.forEach(t => t.setAttribute('aria-expanded', 'false'));
     }
     
     if (window.lucide) {
