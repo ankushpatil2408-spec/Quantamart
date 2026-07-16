@@ -574,10 +574,18 @@ async function fetchUserOrders(email) {
             const paymentStatusBadgeClass = payment.status === 'COMPLETED' ? 'success' : 'pending';
             const paymentStatusText = payment.status || 'PENDING';
 
+            // Normalize order status display classes
+            let statusClass = 'pending';
+            if (order.status === 'PAID' || order.status === 'DELIVERED') {
+                statusClass = 'success';
+            } else if (order.status === 'SHIPPED' || order.status === 'IN_TRANSIT') {
+                statusClass = 'accent-badge'; // Wait, let's use standard or simple colors
+            }
+
             card.innerHTML = `
                 <div class="order-history-header">
                     <span class="order-history-title">Order #${order.id}</span>
-                    <span class="badge ${order.status === 'PAID' ? 'success' : 'pending'}">${order.status}</span>
+                    <span class="badge ${statusClass}">${order.status}</span>
                 </div>
                 <div class="order-history-details">
                     <div>
@@ -605,6 +613,20 @@ async function fetchUserOrders(email) {
                             <span class="oh-label">Payment Status:</span>
                             <span class="badge ${paymentStatusBadgeClass}" style="padding: 2px 8px; font-size: 0.7rem;">${paymentStatusText}</span>
                         </div>
+                    </div>
+                    
+                    <!-- Simulated Order Shipping & Status Changer -->
+                    <div class="simulation-status-control" style="grid-column: 1 / -1;">
+                        <span class="simulation-label">
+                            <i data-lucide="truck" style="width: 14px; height: 14px;"></i> Update Status (Demo):
+                        </span>
+                        <select class="status-select" onchange="updateSimulatedOrderStatus(${order.id}, this.value, '${order.email}')">
+                            <option value="PENDING" ${order.status === 'PENDING' ? 'selected' : ''}>PENDING</option>
+                            <option value="PAID" ${order.status === 'PAID' ? 'selected' : ''}>PAID</option>
+                            <option value="SHIPPED" ${order.status === 'SHIPPED' ? 'selected' : ''}>SHIPPED</option>
+                            <option value="IN_TRANSIT" ${order.status === 'IN_TRANSIT' ? 'selected' : ''}>IN TRANSIT</option>
+                            <option value="DELIVERED" ${order.status === 'DELIVERED' ? 'selected' : ''}>DELIVERED</option>
+                        </select>
                     </div>
                 </div>
             `;
@@ -1042,3 +1064,582 @@ function handleLogout() {
     updateAuthUI();
     showToast('Logged out successfully.');
 }
+
+// ==========================================================================
+// Notification Module (Emails Hub) & Forgot Password Client-side Logic
+// ==========================================================================
+
+let allSentEmails = [];
+let emailFilter = 'all';
+let selectedEmailId = null;
+
+// Initialize Notification & Reset UI on DOM load
+window.addEventListener('DOMContentLoaded', () => {
+    initNotificationsHub();
+    initPasswordResetFlow();
+});
+
+// Setup badge & fetch check periodically
+function initNotificationsHub() {
+    const navBtn = document.getElementById('notificationsNavBtn');
+    const modal = document.getElementById('notificationsModal');
+    const closeBtn = document.getElementById('closeNotificationsBtn');
+    const overlay = document.getElementById('notificationsOverlay');
+    const pills = document.querySelectorAll('.filter-pills .pill');
+
+    if (navBtn) {
+        navBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            openNotificationsModal();
+        });
+    }
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeNotificationsModal);
+    }
+
+    if (overlay) {
+        overlay.addEventListener('click', closeNotificationsModal);
+    }
+
+    // Filter pills
+    pills.forEach(pill => {
+        pill.addEventListener('click', () => {
+            pills.forEach(p => p.classList.remove('active'));
+            pill.classList.add('active');
+            emailFilter = pill.getAttribute('data-filter');
+            renderEmailsList();
+        });
+    });
+
+    // Initial check for emails
+    pollEmails();
+    // Check every 10 seconds for new emails
+    setInterval(pollEmails, 10000);
+}
+
+// Toggle Red dot on Email navigation
+function triggerNotificationBadge() {
+    const navBtn = document.getElementById('notificationsNavBtn');
+    if (!navBtn) return;
+    
+    // Check if dot already exists
+    let dot = navBtn.querySelector('.notification-badge-dot');
+    if (!dot) {
+        dot = document.createElement('span');
+        dot.className = 'notification-badge-dot';
+        navBtn.appendChild(dot);
+    }
+}
+
+function removeNotificationBadge() {
+    const navBtn = document.getElementById('notificationsNavBtn');
+    if (!navBtn) return;
+    const dot = navBtn.querySelector('.notification-badge-dot');
+    if (dot) {
+        dot.remove();
+    }
+}
+
+// Fetch sent emails from Express server API
+async function pollEmails() {
+    try {
+        const response = await fetch('/api/notifications/emails');
+        if (!response.ok) return;
+        const data = await response.json();
+        
+        // If length increased, trigger badge
+        if (data.length > allSentEmails.length && allSentEmails.length > 0) {
+            triggerNotificationBadge();
+            showToast('New email notification received!', 'success');
+        }
+        
+        allSentEmails = data;
+        
+        // If modal is open, refresh the view
+        const modal = document.getElementById('notificationsModal');
+        if (modal && modal.classList.contains('active')) {
+            renderEmailsList();
+        }
+    } catch (err) {
+        console.error('Error polling emails:', err);
+    }
+}
+
+function openNotificationsModal() {
+    const modal = document.getElementById('notificationsModal');
+    if (modal) {
+        modal.classList.add('active');
+        removeNotificationBadge();
+        pollEmails().then(() => {
+            renderEmailsList();
+        });
+    }
+}
+
+function closeNotificationsModal() {
+    const modal = document.getElementById('notificationsModal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
+// Render list of emails in Sidebar
+function renderEmailsList() {
+    const listContainer = document.getElementById('emailsList');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '';
+
+    const filtered = allSentEmails.filter(email => {
+        if (emailFilter === 'all') return true;
+        return email.type === emailFilter;
+    });
+
+    if (filtered.length === 0) {
+        listContainer.innerHTML = `
+            <div style="text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.85rem;">
+                No emails found.
+            </div>
+        `;
+        return;
+    }
+
+    // Render emails in reverse order (newest first)
+    const sorted = [...filtered].reverse();
+
+    sorted.forEach(email => {
+        const item = document.createElement('div');
+        item.className = `email-item ${selectedEmailId === email.id ? 'active' : ''}`;
+        
+        const dateStr = new Date(email.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        
+        item.innerHTML = `
+            <span class="email-item-to">To: ${email.to}</span>
+            <div class="email-item-subject">${email.subject}</div>
+            <div class="email-item-footer">
+                <span class="email-type-badge ${email.type}">${email.type.replace('_', ' ')}</span>
+                <span>${dateStr}</span>
+            </div>
+        `;
+
+        item.addEventListener('click', () => {
+            selectedEmailId = email.id;
+            // Highlight active item
+            document.querySelectorAll('.email-item').forEach(el => el.classList.remove('active'));
+            item.classList.add('active');
+            displayEmailDetails(email);
+        });
+
+        listContainer.appendChild(item);
+    });
+
+    // Keep active selected or auto select first email
+    if (selectedEmailId) {
+        const currentSelected = sorted.find(e => e.id === selectedEmailId);
+        if (currentSelected) {
+            displayEmailDetails(currentSelected);
+            return;
+        }
+    }
+}
+
+// Display HTML email inside IFrame safely
+function displayEmailDetails(email) {
+    const emptyView = document.getElementById('emailViewerEmpty');
+    const headerView = document.getElementById('emailViewerHeader');
+    const bodyContainer = document.getElementById('emailViewerBodyContainer');
+    const iframe = document.getElementById('emailBodyIframe');
+
+    if (!emptyView || !headerView || !bodyContainer || !iframe) return;
+
+    emptyView.style.display = 'none';
+    headerView.style.display = 'block';
+    bodyContainer.style.display = 'block';
+
+    document.getElementById('emailViewerSubject').textContent = email.subject;
+    document.getElementById('emailViewerTo').textContent = email.to;
+    document.getElementById('emailViewerDate').textContent = new Date(email.sentAt).toLocaleString();
+
+    // Render HTML inside iframe securely to isolate styles
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(email.body);
+    doc.close();
+}
+
+// Password Reset Flow UI Controllers
+function initPasswordResetFlow() {
+    const forgotBtn = document.getElementById('forgotPasswordBtn');
+    const authModal = document.getElementById('authModal');
+    const resetModal = document.getElementById('resetPasswordModal');
+    const closeResetBtn = document.getElementById('closeResetPasswordBtn');
+    const resetOverlay = document.getElementById('resetPasswordOverlay');
+
+    const forgotForm = document.getElementById('forgotPasswordForm');
+    const resetForm = document.getElementById('resetPasswordForm');
+
+    const stepRequest = document.getElementById('resetStepRequest');
+    const stepSubmit = document.getElementById('resetStepSubmit');
+
+    const resetEmailInput = document.getElementById('resetEmailInput');
+
+    if (forgotBtn) {
+        forgotBtn.addEventListener('click', () => {
+            if (authModal) authModal.classList.remove('active');
+            if (resetModal) {
+                resetModal.classList.add('active');
+                // Reset to step 1
+                stepRequest.classList.remove('hidden');
+                stepSubmit.classList.add('hidden');
+                forgotForm.reset();
+                resetForm.reset();
+            }
+        });
+    }
+
+    function handleCloseReset() {
+        if (resetModal) resetModal.classList.remove('active');
+    }
+
+    if (closeResetBtn) closeResetBtn.addEventListener('click', handleCloseReset);
+    if (resetOverlay) resetOverlay.addEventListener('click', handleCloseReset);
+
+    // Form 1: Request Code
+    if (forgotForm) {
+        forgotForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = resetEmailInput.value.trim();
+
+            try {
+                const submitBtn = forgotForm.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<div class="spinner" style="width: 16px; height: 16px; border-width: 2px; margin-right: 4px;"></div> Sending...';
+
+                const response = await fetch('/api/auth/forgot-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.message || 'Error requesting reset');
+                }
+
+                showToast('Reset code sent! Inspect Emails Hub to copy the 6-digit code.', 'success');
+                triggerNotificationBadge();
+
+                // Switch step
+                stepRequest.classList.add('hidden');
+                stepSubmit.classList.remove('hidden');
+            } catch (err) {
+                console.error(err);
+                showToast(err.message || 'Error requesting password reset.', 'error');
+            } finally {
+                const submitBtn = forgotForm.querySelector('button[type="submit"]');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i data-lucide="send"></i> Send Reset Code';
+                if (window.lucide) lucide.createIcons();
+            }
+        });
+    }
+
+    // Form 2: Submit Reset Password
+    if (resetForm) {
+        resetForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = resetEmailInput.value.trim();
+            const code = document.getElementById('resetCodeInput').value.trim();
+            const newPassword = document.getElementById('resetNewPasswordInput').value;
+
+            try {
+                const submitBtn = resetForm.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<div class="spinner" style="width: 16px; height: 16px; border-width: 2px; margin-right: 4px;"></div> Resetting...';
+
+                const response = await fetch('/api/auth/reset-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, code, newPassword })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.message || 'Invalid or expired code');
+                }
+
+                showToast('Password reset successfully! You can now log in.', 'success');
+                handleCloseReset();
+                openAuth(); // Redirect back to sign in
+            } catch (err) {
+                console.error(err);
+                showToast(err.message || 'Failed to reset password. Check your code.', 'error');
+            } finally {
+                const submitBtn = resetForm.querySelector('button[type="submit"]');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i data-lucide="key-round"></i> Update Password';
+                if (window.lucide) lucide.createIcons();
+            }
+        });
+    }
+}
+
+// Global Order update helper for simulated shipping triggers
+async function updateSimulatedOrderStatus(orderId, newStatus, customerEmail) {
+    try {
+        const response = await fetch(`/api/orders/${orderId}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus })
+        });
+        
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to update order status');
+        }
+        
+        showToast(`Order #${orderId} updated to ${newStatus}! Shipping update email triggered.`, 'success');
+        fetchUserOrders(customerEmail);
+        triggerNotificationBadge();
+    } catch (err) {
+        console.error(err);
+        showToast(err.message || 'Failed to update simulated status.', 'error');
+    }
+}
+window.updateSimulatedOrderStatus = updateSimulatedOrderStatus;
+
+// ==========================================================================
+// AI Shopping Assistant Client Integration
+// ==========================================================================
+
+function initAiShoppingAssistant() {
+    const aiChatToggleBtn = document.getElementById('aiChatToggleBtn');
+    const aiChatPanel = document.getElementById('aiChatPanel');
+    const aiMinimizeBtn = document.getElementById('aiMinimizeBtn');
+    const aiClearChatBtn = document.getElementById('aiClearChatBtn');
+    const aiChatForm = document.getElementById('aiChatForm');
+    const aiChatInput = document.getElementById('aiChatInput');
+    const aiChatMessages = document.getElementById('aiChatMessages');
+    const aiTypingIndicator = document.getElementById('aiTypingIndicator');
+    const aiChatBody = document.getElementById('aiChatBody');
+
+    if (!aiChatToggleBtn || !aiChatPanel) return;
+
+    // Retrieve or initialize unique guest/user session identifier
+    let aiSessionId = localStorage.getItem('aiSessionId');
+    if (!aiSessionId) {
+        aiSessionId = 'session_' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('aiSessionId', aiSessionId);
+    }
+
+    // Toggle Chat Panel visibility
+    aiChatToggleBtn.addEventListener('click', () => {
+        aiChatPanel.classList.toggle('hidden');
+        if (!aiChatPanel.classList.contains('hidden')) {
+            scrollToBottom();
+            aiChatInput.focus();
+        }
+    });
+
+    // Minimize Panel
+    if (aiMinimizeBtn) {
+        aiMinimizeBtn.addEventListener('click', () => {
+            aiChatPanel.classList.add('hidden');
+        });
+    }
+
+    // Clear Chat history on click
+    if (aiClearChatBtn) {
+        aiClearChatBtn.addEventListener('click', async () => {
+            if (confirm('Are you sure you want to clear your conversation history?')) {
+                try {
+                    await fetch('/api/ai/clear', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sessionId: aiSessionId })
+                    });
+                    aiChatMessages.innerHTML = '';
+                    showToast('AI conversation history cleared.');
+                } catch (err) {
+                    console.error('Error clearing chat:', err);
+                    showToast('Failed to clear chat history.', 'error');
+                }
+            }
+        });
+    }
+
+    // Register click for quick query action chips
+    document.querySelectorAll('.ai-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const query = chip.getAttribute('data-query');
+            if (query) {
+                sendAiUserMessage(query);
+            }
+        });
+    });
+
+    // Form submission listener
+    aiChatForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = aiChatInput.value.trim();
+        if (text) {
+            sendAiUserMessage(text);
+            aiChatInput.value = '';
+        }
+    });
+
+    // Send User Message to Backend Route
+    async function sendAiUserMessage(text) {
+        // Render user bubble in UI
+        appendMessageToUi('user', text);
+        scrollToBottom();
+
+        // Show typing feedback
+        aiTypingIndicator.classList.remove('hidden');
+        scrollToBottom();
+
+        try {
+            const response = await fetch('/api/ai/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text, sessionId: aiSessionId })
+            });
+
+            const data = await response.json();
+            aiTypingIndicator.classList.add('hidden');
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Server error');
+            }
+
+            // Append assistant bubble & linked matched product card items
+            appendMessageToUi('assistant', data.reply, data.recommendedProductIds);
+            scrollToBottom();
+
+        } catch (err) {
+            console.error(err);
+            aiTypingIndicator.classList.add('hidden');
+            appendMessageToUi('assistant', `⚠️ **Error:** ${err.message || 'Could not reach model.'}\n\nPlease check if your **GEMINI_API_KEY** is configured in **Settings > Secrets** panel.`);
+            scrollToBottom();
+        }
+    }
+
+    // Append Message with styled custom layout & nested products list
+    function appendMessageToUi(role, text, recommendedProductIds = []) {
+        const msgContainer = document.createElement('div');
+        msgContainer.className = `ai-msg ${role}`;
+
+        const bubble = document.createElement('div');
+        bubble.className = 'ai-msg-bubble';
+        bubble.innerHTML = formatMarkdown(text);
+        msgContainer.appendChild(bubble);
+
+        // Render inline catalog product cards if returned from AI schema
+        if (recommendedProductIds && recommendedProductIds.length > 0) {
+            const recContainer = document.createElement('div');
+            recContainer.className = 'ai-recommended-container';
+            
+            const titleEl = document.createElement('div');
+            titleEl.className = 'ai-recommended-title';
+            titleEl.textContent = 'Suggested Products:';
+            recContainer.appendChild(titleEl);
+
+            recommendedProductIds.forEach(id => {
+                const product = products.find(p => p.id === id);
+                if (product) {
+                    const prodCard = document.createElement('div');
+                    prodCard.className = 'ai-product-card';
+
+                    const ratingVal = product.rating || 4.0;
+                    const ratingStars = "★".repeat(Math.round(ratingVal)) + "☆".repeat(5 - Math.round(ratingVal));
+                    const inrVal = Math.round(product.price * 83).toLocaleString('en-IN');
+
+                    prodCard.innerHTML = `
+                        <img class="ai-product-img" src="${product.imageUrl}" alt="${product.name}" onclick="openProductDetail(${product.id}); document.getElementById('aiChatPanel').classList.add('hidden');" style="cursor: pointer;">
+                        <div class="ai-product-details" onclick="openProductDetail(${product.id}); document.getElementById('aiChatPanel').classList.add('hidden');" style="cursor: pointer; min-width: 0;">
+                            <h4 class="ai-product-name">${product.name}</h4>
+                            <div class="ai-product-price">
+                                $${product.price.toFixed(2)}
+                                <span class="inr-conv">(~₹${inrVal})</span>
+                            </div>
+                            <div class="ai-product-rating">${ratingStars} ${ratingVal.toFixed(1)}</div>
+                        </div>
+                        <div class="ai-product-actions">
+                            <button class="ai-prod-btn add" onclick="addToCart(${product.id})">
+                                <i data-lucide="shopping-cart"></i> +Cart
+                            </button>
+                            <button class="ai-prod-btn view" onclick="openProductDetail(${product.id}); document.getElementById('aiChatPanel').classList.add('hidden');">
+                                <i data-lucide="eye"></i> Details
+                            </button>
+                        </div>
+                    `;
+                    recContainer.appendChild(prodCard);
+                }
+            });
+            msgContainer.appendChild(recContainer);
+        }
+
+        const meta = document.createElement('div');
+        meta.className = 'ai-msg-meta';
+        const now = new Date();
+        meta.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        msgContainer.appendChild(meta);
+
+        aiChatMessages.appendChild(msgContainer);
+
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    }
+
+    // Scroll chat area to bottom helper
+    function scrollToBottom() {
+        aiChatBody.scrollTop = aiChatBody.scrollHeight;
+    }
+
+    // Safely escape and render simple Markdown as HTML
+    function formatMarkdown(text) {
+        if (!text) return '';
+        let escaped = text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+        
+        // Match bold markers: **text**
+        escaped = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        // Match list items: - text or * text
+        escaped = escaped.replace(/^\s*[-*]\s+(.*)$/gm, '<li>$1</li>');
+        escaped = escaped.replace(/(<li>.*<\/li>)/s, '<ul>$1<\/ul>');
+        // Match line breaks
+        escaped = escaped.replace(/\n/g, '<br>');
+        return escaped;
+    }
+
+    // Load Chat History from Server on Load
+    async function loadChatHistory() {
+        try {
+            const response = await fetch(`/api/ai/history?sessionId=${aiSessionId}`);
+            if (!response.ok) return;
+            const history = await response.json();
+            
+            if (history && history.length > 0) {
+                aiChatMessages.innerHTML = '';
+                history.forEach(item => {
+                    appendMessageToUi(item.role === 'user' ? 'user' : 'assistant', item.parts[0].text);
+                });
+                scrollToBottom();
+            }
+        } catch (err) {
+            console.error('Error loading AI history:', err);
+        }
+    }
+
+    // Retrieve previous conversations
+    loadChatHistory();
+}
+
+// Hook into DOM load triggers safely
+window.addEventListener('load', () => {
+    initAiShoppingAssistant();
+});

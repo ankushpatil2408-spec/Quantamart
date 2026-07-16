@@ -24,6 +24,9 @@
             <nav class="nav-links">
                 <a href="#" id="shopNavBtn" class="nav-link active">Shop</a>
                 <a href="#" id="ordersNavBtn" class="nav-link">My Orders</a>
+                <a href="#" id="notificationsNavBtn" class="nav-link" style="display: flex; align-items: center; gap: 4px;">
+                    <i data-lucide="mail" style="width: 16px; height: 16px;"></i> Emails Hub
+                </a>
                 <span id="authSection" class="auth-section"></span>
             </nav>
             <button id="cartBtn" class="cart-btn" aria-label="Open Cart">
@@ -373,6 +376,10 @@
                         <input type="password" id="authPassword" required placeholder="••••••••">
                     </div>
 
+                    <div id="forgotPasswordWrapper" class="form-group" style="display: flex; justify-content: flex-end; margin-top: -0.5rem; margin-bottom: 1rem;">
+                        <button type="button" id="forgotPasswordBtn" class="toggle-auth-link" style="font-size: 0.8rem; font-weight: 500; cursor: pointer;">Forgot Password?</button>
+                    </div>
+
                     <div id="roleFormGroup" class="form-group hidden">
                         <label for="authRole">Select Role</label>
                         <select id="authRole" class="form-select">
@@ -487,6 +494,177 @@
                     <button id="successCloseBtn" class="btn btn-secondary">Continue Shopping</button>
                     <button id="successViewOrdersBtn" class="btn btn-accent">View My Orders</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Emails Hub / Notifications Modal -->
+    <div id="notificationsModal" class="modal detail-modal">
+        <div class="modal-overlay" id="notificationsOverlay"></div>
+        <div class="modal-content detail-content notifications-modal-content" style="max-width: 900px; width: 90%;">
+            <div class="modal-header">
+                <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                    <i data-lucide="mail"></i> Emails Hub &amp; Notifications Simulator
+                </h2>
+                <button id="closeNotificationsBtn" class="close-btn" aria-label="Close Notifications">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 0; display: flex; height: 600px; background-color: #f1f5f9;">
+                <!-- Sidebar: Email List -->
+                <div class="emails-sidebar" style="width: 35%; border-right: 1px solid var(--border-dark); background: white; display: flex; flex-direction: column; height: 100%;">
+                    <div class="emails-sidebar-header" style="padding: 1rem; border-bottom: 1px solid var(--border-dark);">
+                        <div class="filter-pills" style="display: flex; gap: 0.25rem; flex-wrap: wrap;">
+                            <button class="pill active" data-filter="all">All</button>
+                            <button class="pill" data-filter="REGISTRATION">Reg</button>
+                            <button class="pill" data-filter="ORDER_CONFIRMATION">Order</button>
+                            <button class="pill" data-filter="SHIPPING_UPDATE">Ship</button>
+                            <button class="pill" data-filter="PASSWORD_RESET">Reset</button>
+                        </div>
+                    </div>
+                    <div id="emailsList" class="emails-list" style="flex: 1; overflow-y: auto;">
+                        <!-- Dynamic email items -->
+                    </div>
+                </div>
+
+                <!-- Main Content: Email Viewer -->
+                <div class="email-viewer" style="width: 65%; display: flex; flex-direction: column; background: #f8fafc; height: 100%;">
+                    <div id="emailViewerHeader" class="email-viewer-header" style="padding: 1.5rem; background: white; border-bottom: 1px solid var(--border-dark); display: none;">
+                        <h3 id="emailViewerSubject" style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 600; color: var(--primary); margin-bottom: 0.5rem;">Subject</h3>
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: var(--text-muted);">
+                          <div>
+                            <span>From: </span><strong style="color: var(--primary);">QuantaMart Notifications &lt;noreply@quantamart.com&gt;</strong><br>
+                            <span>To: </span><span id="emailViewerTo" style="color: var(--primary); font-weight: 500;">user@example.com</span>
+                          </div>
+                          <span id="emailViewerDate">Date</span>
+                        </div>
+                    </div>
+                    <div id="emailViewerEmpty" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); padding: 2rem; text-align: center;">
+                        <i data-lucide="mail-open" style="width: 48px; height: 48px; margin-bottom: 1rem; color: var(--border-dark);"></i>
+                        <h3>No Email Selected</h3>
+                        <p style="font-size: 0.9rem; max-width: 250px; margin-top: 0.25rem;">Select an email from the left sidebar to view the fully-rendered HTML template.</p>
+                    </div>
+                    <div id="emailViewerBodyContainer" style="flex: 1; overflow-y: auto; padding: 1.5rem; display: none; height: calc(100% - 90px);">
+                        <iframe id="emailBodyIframe" style="width: 100%; height: 100%; border: none; background: white; border-radius: 8px; box-shadow: var(--shadow-sm);"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Password Reset Modal -->
+    <div id="resetPasswordModal" class="modal detail-modal">
+        <div class="modal-overlay" id="resetPasswordOverlay"></div>
+        <div class="modal-content detail-content auth-modal-content">
+            <div class="modal-header">
+                <h2>Reset Your Password</h2>
+                <button id="closeResetPasswordBtn" class="close-btn">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Step 1: Request Code -->
+                <div id="resetStepRequest" class="reset-step">
+                    <p class="lookup-info" style="margin-bottom: 1rem; font-size: 0.9rem;">Enter your email address and we'll send you a 6-digit verification code to reset your password.</p>
+                    <form id="forgotPasswordForm">
+                        <div class="form-group">
+                            <label for="resetEmailInput">Email Address</label>
+                            <input type="email" id="resetEmailInput" required placeholder="you@example.com">
+                        </div>
+                        <button type="submit" class="submit-order-btn" style="margin-top: 1rem;">
+                            <i data-lucide="send"></i> Send Reset Code
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Step 2: Enter Code & New Password -->
+                <div id="resetStepSubmit" class="reset-step hidden">
+                    <p class="lookup-info" style="margin-bottom: 1rem; color: var(--success); font-size: 0.9rem; font-weight: 500;">✔ Code sent! Please check your "Emails Hub" to copy the 6-digit code.</p>
+                    <form id="resetPasswordForm">
+                        <div class="form-group">
+                            <label for="resetCodeInput">6-Digit Code</label>
+                            <input type="text" id="resetCodeInput" required placeholder="123456" pattern="[0-9]{6}" maxlength="6">
+                        </div>
+                        <div class="form-group">
+                            <label for="resetNewPasswordInput">New Password</label>
+                            <input type="password" id="resetNewPasswordInput" required placeholder="Enter new password">
+                        </div>
+                        <button type="submit" class="submit-order-btn" style="margin-top: 1rem;">
+                            <i data-lucide="key-round"></i> Update Password
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Shopping Assistant Chat Widget -->
+    <div id="aiChatWidget" class="ai-chat-widget">
+        <!-- Floating Toggle Button -->
+        <button id="aiChatToggleBtn" class="ai-chat-toggle-btn" aria-label="Ask AI Assistant">
+            <i data-lucide="sparkles" class="toggle-icon-sparkles"></i>
+            <span class="toggle-text">AI Assistant</span>
+        </button>
+
+        <!-- Chat Window Panel -->
+        <div id="aiChatPanel" class="ai-chat-panel hidden">
+            <!-- Panel Header -->
+            <div class="ai-chat-header">
+                <div class="ai-chat-header-info">
+                    <div class="ai-avatar">
+                        <i data-lucide="sparkles"></i>
+                        <span class="online-indicator"></span>
+                    </div>
+                    <div>
+                        <h3>Quantamart AI</h3>
+                        <p class="status-text">Online Companion</p>
+                    </div>
+                </div>
+                <div class="ai-chat-header-actions">
+                    <button id="aiClearChatBtn" class="header-action-btn" title="Clear Chat History">
+                        <i data-lucide="trash-2"></i>
+                    </button>
+                    <button id="aiMinimizeBtn" class="header-action-btn" title="Minimize">
+                        <i data-lucide="minus"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chat Body (Messages Area) -->
+            <div id="aiChatBody" class="ai-chat-body">
+                <div class="ai-welcome-box">
+                    <p>Hi! I am your <strong>Quantamart AI Shopping Assistant</strong>. Integrated with Gemini, I can search our catalog, convert currencies, and explain our product benefits.</p>
+                    <p style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted);">Try selecting a query below or type your own question!</p>
+                </div>
+                
+                <!-- Interactive Action Chips -->
+                <div class="ai-chips-container">
+                    <button class="ai-chip" data-query="I need a laptop under ₹60,000">💻 Laptop under ₹60K</button>
+                    <button class="ai-chip" data-query="What electronics do you have under $200?">🔌 Electronics under $200</button>
+                    <button class="ai-chip" data-query="Show me top rated lifestyle products">⭐️ Top Rated Lifestyle</button>
+                    <button class="ai-chip" data-query="Do you have any bags?">🎒 Bags &amp; Packs</button>
+                </div>
+                
+                <!-- Dynamic Messages List -->
+                <div id="aiChatMessages" class="ai-messages-list"></div>
+            </div>
+
+            <!-- Chat Input Footer -->
+            <div class="ai-chat-footer">
+                <div id="aiTypingIndicator" class="ai-typing-indicator hidden">
+                    <div class="typing-dots">
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                    </div>
+                    <span class="typing-text">AI is typing...</span>
+                </div>
+                <form id="aiChatForm" class="ai-chat-form">
+                    <input type="text" id="aiChatInput" placeholder="Ask Quantamart AI..." required autocomplete="off">
+                    <button type="submit" id="aiSendBtn" aria-label="Send Message">
+                        <i data-lucide="send"></i>
+                    </button>
+                </form>
             </div>
         </div>
     </div>
