@@ -24,6 +24,7 @@
             <nav class="nav-links">
                 <a href="#" id="homeNavBtn" class="nav-link active">Home</a>
                 <a href="#" id="shopNavBtn" class="nav-link">Shop</a>
+                <a href="#" id="workspaceNavBtn" class="nav-link">Workspace Console</a>
                 <a href="#" id="aboutNavBtn" class="nav-link">About</a>
                 <a href="#" id="contactNavBtn" class="nav-link">Contact</a>
                 
@@ -512,6 +513,68 @@
         </div>
     </div>
 
+    <!-- Workspace Page Container (Hidden by default, shown when clicking Workspace Console) -->
+    <div id="workspacePageContainer" class="hidden" style="max-width: 1400px; margin: 2rem auto; padding: 0 1.5rem; min-height: 80vh;">
+        <!-- Workspace Header Card -->
+        <div class="workspace-header-card" style="background: linear-gradient(135deg, var(--primary) 0%, #1e293b 100%); color: white; padding: 2.5rem; border-radius: 12px; box-shadow: var(--shadow-md); margin-bottom: 2rem; position: relative; overflow: hidden;">
+            <div style="position: relative; z-index: 2; max-width: 800px;">
+                <span style="background: rgba(255,255,255,0.15); color: #60a5fa; font-size: 0.75rem; font-weight: 600; padding: 4px 12px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em;">Quantamart Operations Suite</span>
+                <h1 style="font-family: var(--font-display); font-size: 2.25rem; font-weight: 800; margin-top: 0.5rem; margin-bottom: 0.5rem; letter-spacing: -0.02em;">Enterprise Workspace &amp; Sandbox</h1>
+                <p style="font-size: 0.95rem; color: #cbd5e1; line-height: 1.6;">Welcome to the active control room. Manage user profiles, test advanced AI predictions, simulate payments, track multi-gateway shipments, monitor DevOps metrics, and simulate full platform workflows.</p>
+            </div>
+            <!-- Absolute background visual shape -->
+            <div style="position: absolute; right: -50px; bottom: -50px; width: 300px; height: 300px; background: radial-gradient(circle, rgba(96,165,250,0.1) 0%, transparent 70%); pointer-events: none;"></div>
+        </div>
+
+        <!-- Workspace Layout: Left Navigation, Right Panel -->
+        <div style="display: flex; gap: 2rem; flex-direction: column; md:flex-direction: row;" class="workspace-layout-container">
+            <!-- Sidebar Navigation -->
+            <div style="width: 100%; md:width: 280px; flex-shrink: 0;" class="workspace-sidebar">
+                <div style="background: white; border-radius: 12px; border: 1px solid var(--border-dark); padding: 1.25rem; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 0.5rem; position: sticky; top: 100px;">
+                    <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; padding-left: 0.75rem; margin-bottom: 0.5rem;">Select Control Panel</div>
+                    
+                    <button class="ws-tab-btn active" id="wsTabSandbox" style="display: flex; align-items: center; gap: 0.75rem; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; text-align: left; font-weight: 600; font-size: 0.9rem; border: none; cursor: pointer; transition: all 0.2s;">
+                        <i data-lucide="test-tube-2" style="width: 18px; height: 18px;"></i>
+                        <span style="flex: 1;">Developer Sandbox</span>
+                        <span style="background: var(--accent); color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 700;">LIVE</span>
+                    </button>
+
+                    <button class="ws-tab-btn" id="wsTabCustomer" style="display: flex; align-items: center; gap: 0.75rem; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; text-align: left; font-weight: 600; font-size: 0.9rem; border: none; cursor: pointer; transition: all 0.2s;">
+                        <i data-lucide="user" style="width: 18px; height: 18px;"></i>
+                        <span style="flex: 1;">Customer Dashboard</span>
+                        <i data-lucide="lock" class="tab-lock-icon" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                    </button>
+
+                    <button class="ws-tab-btn" id="wsTabSeller" style="display: flex; align-items: center; gap: 0.75rem; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; text-align: left; font-weight: 600; font-size: 0.9rem; border: none; cursor: pointer; transition: all 0.2s;">
+                        <i data-lucide="store" style="width: 18px; height: 18px;"></i>
+                        <span style="flex: 1;">Seller Dashboard</span>
+                        <i data-lucide="lock" class="tab-lock-icon" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                    </button>
+
+                    <button class="ws-tab-btn" id="wsTabAdmin" style="display: flex; align-items: center; gap: 0.75rem; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; text-align: left; font-weight: 600; font-size: 0.9rem; border: none; cursor: pointer; transition: all 0.2s;">
+                        <i data-lucide="shield-check" style="width: 18px; height: 18px;"></i>
+                        <span style="flex: 1;">Admin Control Panel</span>
+                        <i data-lucide="lock" class="tab-lock-icon" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                    </button>
+                    
+                    <div style="border-top: 1px solid var(--border-dark); margin-top: 1rem; padding-top: 1rem; text-align: center;">
+                        <div id="wsUserStatusBadge" style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Role: Guest Visitor</div>
+                        <button id="wsQuickAuthToggle" class="btn btn-secondary" style="width: 100%; font-size: 0.8rem; padding: 0.5rem;">
+                            <i data-lucide="log-in" style="width: 14px; height: 14px;"></i> Sign In To Unlock
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel Content Area -->
+            <div style="flex: 1;" class="workspace-main-panel">
+                <div id="workspacePanelContent" style="background: white; border-radius: 12px; border: 1px solid var(--border-dark); min-height: 600px; padding: 2rem; box-shadow: var(--shadow-sm);">
+                    <!-- Content will be injected dynamically via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Emails Hub / Notifications Modal -->
     <div id="notificationsModal" class="modal detail-modal">
         <div class="modal-overlay" id="notificationsOverlay"></div>
@@ -773,6 +836,7 @@
 
     <!-- Scripts -->
     <script src="app.js"></script>
+    <script src="workspace.js"></script>
     <script>
         // Initialize lucide icons once script is loaded
         window.addEventListener('load', () => {

@@ -1,0 +1,51 @@
+[
+  {
+    "timestamp": "2026-07-16T12:51:09.548Z",
+    "event": "USER_LOGIN",
+    "user": "AnkushP",
+    "ip": "127.0.0.1",
+    "status": "SUCCESS"
+  },
+  {
+    "timestamp": "2026-07-16T12:51:09.426Z",
+    "event": "USER_REGISTER",
+    "user": "different",
+    "ip": "127.0.0.1",
+    "status": "FAILED_DUPLICATE_EMAIL"
+  },
+  {
+    "timestamp": "2026-07-16T12:51:09.412Z",
+    "event": "USER_REGISTER",
+    "user": "AnkushP",
+    "ip": "127.0.0.1",
+    "status": "FAILED_DUPLICATE_USERNAME"
+  },
+  {
+    "timestamp": "2026-07-16T12:51:09.395Z",
+    "event": "USER_REGISTER",
+    "user": "AnkushP",
+    "ip": "127.0.0.1",
+    "status": "SUCCESS"
+  },
+  {
+    "timestamp": "2026-07-16T12:46:06.464Z",
+    "event": "SYSTEM_BOOTSTRAP",
+    "user": "SYSTEM",
+    "ip": "127.0.0.1",
+    "status": "SUCCESS"
+  },
+  {
+    "timestamp": "2026-07-16T12:47:06.464Z",
+    "event": "DB_SEED",
+    "user": "SYSTEM",
+    "ip": "127.0.0.1",
+    "status": "SUCCESS"
+  },
+  {
+    "timestamp": "2026-07-16T12:48:06.464Z",
+    "event": "PORT_BIND",
+    "user": "SYSTEM",
+    "ip": "0.0.0.0",
+    "status": "SUCCESS"
+  }
+]

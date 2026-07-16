@@ -4,11 +4,43 @@ import { fileURLToPath } from "url";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { GoogleGenAI, Type } from "@google/genai";
+import fs from "fs";
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+
+// ==========================================================================
+// Local JSON File Database Persistence Support
+// ==========================================================================
+const DATA_DIR = path.join(process.cwd(), "data");
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+function loadJSON<T>(filename: string, defaultValue: T): T {
+  const filePath = path.join(DATA_DIR, filename);
+  if (fs.existsSync(filePath)) {
+    try {
+      return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+    } catch (e) {
+      console.error(`Error reading database file ${filename}:`, e);
+    }
+  }
+  // Write default values immediately to establish the schema file
+  saveJSON(filename, defaultValue);
+  return defaultValue;
+}
+
+function saveJSON<T>(filename: string, data: T) {
+  const filePath = path.join(DATA_DIR, filename);
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+  } catch (e) {
+    console.error(`Error writing database file ${filename}:`, e);
+  }
+}
 
 // Lazy-initialized Gemini client
 let geminiClient: GoogleGenAI | null = null;
@@ -33,7 +65,7 @@ function getGeminiClient(): GoogleGenAI {
 const JWT_SECRET = "SuperSecureSecretKeyThatIsAtLeast256BitsLongAndSafeToUseForJWTTokenSigning123!";
 
 // Mock Users Database matching Spring Boot DataInitializer seeding
-let users = [
+const DEFAULT_USERS = [
   {
     id: 1,
     username: "admin",
@@ -57,8 +89,10 @@ let users = [
   }
 ];
 
+let users = loadJSON("users.json", DEFAULT_USERS);
+
 // Mock Products Database
-let products = [
+const DEFAULT_PRODUCTS = [
   {
     id: 1,
     name: "Minimalist Leather Backpack",
@@ -270,25 +304,27 @@ let products = [
   }
 ];
 
+let products = loadJSON("products.json", DEFAULT_PRODUCTS);
+
 // Mock Orders Database
-let orders: Array<{
+let orders = loadJSON<Array<{
   id: number;
   customerName: string;
   email: string;
   totalAmount: number;
   status: string;
   payment?: any;
-}> = [];
+}>>("orders.json", []);
 
 // Mock Payments Database
-let payments: Array<{
+let payments = loadJSON<Array<{
   id: number;
   orderId: number;
   transactionId: string;
   amount: number;
   status: "PENDING" | "COMPLETED" | "FAILED";
   paymentMethod: "COD" | "ONLINE";
-}> = [];
+}>>("payments.json", []);
 
 // ==========================================================================
 // Notification Module (Email Notifications Database, Generators and Seeds)
@@ -303,8 +339,8 @@ interface SentEmail {
   sentAt: string;
 }
 
-let sentEmails: SentEmail[] = [];
-let nextEmailId = 1;
+let sentEmails: SentEmail[] = loadJSON<SentEmail[]>("sentEmails.json", []);
+let nextEmailId = sentEmails.length > 0 ? Math.max(...sentEmails.map(e => e.id)) + 1 : 1;
 
 function sendEmail(to: string, subject: string, body: string, type: "REGISTRATION" | "ORDER_CONFIRMATION" | "SHIPPING_UPDATE" | "PASSWORD_RESET" | "CONTACT_FORM") {
   const newEmail: SentEmail = {
@@ -316,6 +352,7 @@ function sendEmail(to: string, subject: string, body: string, type: "REGISTRATIO
     sentAt: new Date().toISOString()
   };
   sentEmails.unshift(newEmail);
+  saveJSON("sentEmails.json", sentEmails);
   return newEmail;
 }
 
@@ -459,50 +496,79 @@ const initialWelcomeBody = `
   </div>
 </div>`;
 
-sentEmails.push({
-  id: nextEmailId++,
-  to: "customer@quantamart.com",
-  subject: "Welcome to QuantaMart, customer!",
-  body: initialWelcomeBody,
-  type: "REGISTRATION",
-  sentAt: new Date(Date.now() - 3600000).toISOString()
-});
+if (sentEmails.length === 0) {
+  sentEmails.push({
+    id: nextEmailId++,
+    to: "customer@quantamart.com",
+    subject: "Welcome to QuantaMart, customer!",
+    body: initialWelcomeBody,
+    type: "REGISTRATION",
+    sentAt: new Date(Date.now() - 3600000).toISOString()
+  });
+  saveJSON("sentEmails.json", sentEmails);
+}
+
+// ==========================================================================
+// Advanced Feature Databases & Helpers for full-stack Workspace Support
+// ==========================================================================
+
+let DEFAULT_COUPONS = [
+  { code: "WELCOME10", discountPercent: 10, description: "10% off for new customers", active: true },
+  { code: "QUANTA20", discountPercent: 20, description: "20% off site-wide discount", active: true }
+];
+let coupons = loadJSON("coupons.json", DEFAULT_COUPONS);
+
+let returnRequests = loadJSON<Array<{
+  id: number;
+  orderId: number;
+  reason: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  refundAmount: number;
+  requestedAt: string;
+}>>("returnRequests.json", []);
+
+let DEFAULT_AUDIT_LOGS = [
+  { timestamp: new Date(Date.now() - 300000).toISOString(), event: "SYSTEM_BOOTSTRAP", user: "SYSTEM", ip: "127.0.0.1", status: "SUCCESS" },
+  { timestamp: new Date(Date.now() - 240000).toISOString(), event: "DB_SEED", user: "SYSTEM", ip: "127.0.0.1", status: "SUCCESS" },
+  { timestamp: new Date(Date.now() - 180000).toISOString(), event: "PORT_BIND", user: "SYSTEM", ip: "0.0.0.0", status: "SUCCESS" }
+];
+let auditLogs = loadJSON("auditLogs.json", DEFAULT_AUDIT_LOGS);
+
+function logEvent(event: string, user: string, status: string, ip: string = "127.0.0.1") {
+  auditLogs.unshift({
+    timestamp: new Date().toISOString(),
+    event,
+    user,
+    ip,
+    status
+  });
+  if (auditLogs.length > 100) auditLogs.pop();
+  saveJSON("auditLogs.json", auditLogs);
+}
 
 // API: Register
 app.post("/api/auth/register", (req, res) => {
   const { username, email, password, role } = req.body;
   if (!username || !email || !password) {
+    logEvent("USER_REGISTER", username || "unknown", "FAILED_MISSING_FIELDS");
     return res.status(400).json({ message: "Error: Missing required fields!" });
   }
 
-  // Handle duplicate username with smart re-run tolerance:
-  // If a non-default user already exists, and was registered more than 10 seconds ago,
-  // we treat it as a stale user from a previous test run and allow overwriting it.
-  const existingUserIndex = users.findIndex(u => u.username.toLowerCase() === username.toLowerCase());
-  if (existingUserIndex !== -1) {
-    const existingUser = users[existingUserIndex] as any;
-    const isDefaultUser = ["admin", "seller", "customer"].includes(username.toLowerCase());
-    if (isDefaultUser || (existingUser.registeredAt && Date.now() - existingUser.registeredAt < 10000)) {
-      return res.status(400).json({ message: "Error: Username is already taken!" });
-    } else {
-      users.splice(existingUserIndex, 1);
-    }
+  const existingUser = users.find(u => u.username.toLowerCase() === username.toLowerCase());
+  if (existingUser) {
+    logEvent("USER_REGISTER", username, "FAILED_DUPLICATE_USERNAME");
+    return res.status(400).json({ message: "Error: Username is already taken!" });
   }
 
-  // Handle duplicate email with smart re-run tolerance
-  const existingEmailIndex = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
-  if (existingEmailIndex !== -1) {
-    const existingUser = users[existingEmailIndex] as any;
-    const isDefaultUser = ["admin@quantamart.com", "seller@quantamart.com", "customer@quantamart.com"].includes(email.toLowerCase());
-    if (isDefaultUser || (existingUser.registeredAt && Date.now() - existingUser.registeredAt < 10000)) {
-      return res.status(400).json({ message: "Error: Email is already in use!" });
-    } else {
-      users.splice(existingEmailIndex, 1);
-    }
+  const existingEmail = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  if (existingEmail) {
+    logEvent("USER_REGISTER", username, "FAILED_DUPLICATE_EMAIL");
+    return res.status(400).json({ message: "Error: Email is already in use!" });
   }
 
   const userRole = (role || "CUSTOMER").toUpperCase();
   if (!["ADMIN", "CUSTOMER", "SELLER"].includes(userRole)) {
+    logEvent("USER_REGISTER", username, "FAILED_INVALID_ROLE");
     return res.status(400).json({ message: "Error: Invalid Role type. Choose from ADMIN, CUSTOMER, SELLER." });
   }
 
@@ -516,8 +582,9 @@ app.post("/api/auth/register", (req, res) => {
   } as any;
 
   users.push(newUser);
-  // Send Welcome Email
+  saveJSON("users.json", users);
   sendEmail(email, `Welcome to QuantaMart, ${username}!`, generateWelcomeEmail(username, email, userRole), "REGISTRATION");
+  logEvent("USER_REGISTER", username, "SUCCESS");
   res.status(200).json({ message: "User registered successfully!" });
 });
 
@@ -525,15 +592,23 @@ app.post("/api/auth/register", (req, res) => {
 app.post("/api/auth/login", (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
+    logEvent("USER_LOGIN", username || "unknown", "FAILED_MISSING_CREDENTIALS");
     return res.status(400).json({ message: "Error: Missing username or password!" });
   }
 
   const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
   if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
+    logEvent("USER_LOGIN", username, "FAILED_INVALID_CREDENTIALS");
     return res.status(400).json({ message: "Error: Invalid username or password!" });
   }
 
+  if ((user as any).active === false) {
+    logEvent("USER_LOGIN", username, "FAILED_SUSPENDED_ACCOUNT");
+    return res.status(400).json({ message: "Error: Your account has been suspended by an administrator." });
+  }
+
   const token = jwt.sign({ sub: user.username, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
+  logEvent("USER_LOGIN", username, "SUCCESS");
 
   res.status(200).json({
     token,
@@ -588,6 +663,7 @@ app.post("/api/orders", (req, res) => {
   };
 
   payments.push(newPayment);
+  saveJSON("payments.json", payments);
 
   const newOrder = {
     id: orderId,
@@ -599,6 +675,7 @@ app.post("/api/orders", (req, res) => {
   };
 
   orders.push(newOrder);
+  saveJSON("orders.json", orders);
   // Send Order Confirmation Email
   sendEmail(email, `Your QuantaMart Order #${orderId} is Confirmed!`, generateOrderEmail(newOrder), "ORDER_CONFIRMATION");
   res.status(201).json(newOrder);
@@ -743,6 +820,7 @@ app.post("/api/auth/reset-password", (req, res) => {
   }
 
   users[userIndex].passwordHash = bcrypt.hashSync(newPassword, 10);
+  saveJSON("users.json", users);
   resetRequests.splice(requestIndex, 1);
 
   res.status(200).json({ message: "Password reset successfully! You can now log in with your new password." });
@@ -764,6 +842,7 @@ app.put("/api/orders/:id/status", (req, res) => {
 
   const oldStatus = order.status;
   order.status = status;
+  saveJSON("orders.json", orders);
 
   // Send Shipping Update Email
   sendEmail(
@@ -1045,6 +1124,168 @@ GUIDELINES FOR RECOMMENDATIONS:
       message: error.message || "Ensure your GEMINI_API_KEY is configured in Settings > Secrets."
     });
   }
+});
+
+// ==========================================================================
+// WORKSPACE CONSOLE & DEVELOPER SANDBOX API ENDPOINTS
+// ==========================================================================
+
+// Upload New Product (Seller Portal)
+app.post("/api/products", (req, res) => {
+  const { name, description, price, category, brand, rating, stock, imageUrl, specifications } = req.body;
+  if (!name || !price || !category) {
+    return res.status(400).json({ error: "Missing required fields (name, price, category)." });
+  }
+
+  const newId = products.length + 1;
+  const newProduct = {
+    id: newId,
+    name,
+    description: description || "Curated premium lifestyle essential.",
+    price: parseFloat(price),
+    imageUrl: imageUrl || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&q=80&w=400",
+    category,
+    brand: brand || "Quanta",
+    rating: parseFloat(rating) || 4.5,
+    stock: parseInt(stock) || 15,
+    specifications: specifications || []
+  };
+
+  products.push(newProduct);
+  saveJSON("products.json", products);
+  logEvent("PRODUCT_UPLOADED", "SELLER", `Product ID: ${newId} (${name}) uploaded successfully.`, req.ip);
+  res.status(201).json(newProduct);
+});
+
+// Get Platform Users Directory (Admin Panel)
+app.get("/api/admin/users", (req, res) => {
+  const safeUsers = users.map(u => ({
+    id: u.id,
+    username: u.username,
+    email: u.email,
+    role: u.role,
+    active: (u as any).active !== false
+  }));
+  res.json(safeUsers);
+});
+
+// Toggle Account Status (Admin Panel)
+app.post("/api/admin/users/:id/toggle", (req, res) => {
+  const userId = parseInt(req.params.id);
+  const user = users.find(u => u.id === userId);
+  if (!user) {
+    return res.status(404).json({ error: "User not found." });
+  }
+
+  if (user.username === "admin") {
+    return res.status(400).json({ error: "Super Admin cannot be suspended." });
+  }
+
+  (user as any).active = (user as any).active === false ? true : false;
+  saveJSON("users.json", users);
+  const statusStr = (user as any).active ? "ACTIVATED" : "SUSPENDED";
+  logEvent("USER_STATUS_CHANGE", "ADMIN", `User account [${user.username}] was ${statusStr}.`, req.ip);
+
+  res.json({ success: true, username: user.username, active: (user as any).active });
+});
+
+// File Return Request for Order (Customer Portal)
+app.post("/api/orders/:id/return", (req, res) => {
+  const orderId = parseInt(req.params.id);
+  const { reason } = req.body;
+  const order = orders.find(o => o.id === orderId);
+  if (!order) {
+    return res.status(404).json({ error: "Order not found." });
+  }
+
+  const existingRequest = returnRequests.find(r => r.orderId === orderId);
+  if (existingRequest) {
+    return res.status(400).json({ error: "Return request already exists for this order." });
+  }
+
+  const reqId = returnRequests.length + 1;
+  const newRequest = {
+    id: reqId,
+    orderId,
+    reason: reason || "Quality issue",
+    status: "PENDING" as const,
+    refundAmount: order.totalAmount,
+    requestedAt: new Date().toISOString()
+  };
+
+  returnRequests.push(newRequest);
+  saveJSON("returnRequests.json", returnRequests);
+  order.status = "RETURNED"; // Set to returned directly or allow admin approval
+  saveJSON("orders.json", orders);
+  logEvent("RETURN_REQUESTED", order.customerName, `Filed return request ID: ${reqId} for Order #${orderId}.`, req.ip);
+
+  res.status(201).json(newRequest);
+});
+
+// Get Return Requests (Admin Panel)
+app.get("/api/admin/returns", (req, res) => {
+  res.json(returnRequests);
+});
+
+// Approve/Reject Return Request (Admin Panel)
+app.post("/api/admin/returns/:id/approve", (req, res) => {
+  const reqId = parseInt(req.params.id);
+  const { action } = req.body; // 'APPROVE' or 'REJECT'
+  const request = returnRequests.find(r => r.id === reqId);
+  if (!request) {
+    return res.status(404).json({ error: "Return request not found." });
+  }
+
+  const order = orders.find(o => o.id === request.orderId);
+  if (action === "APPROVE") {
+    request.status = "APPROVED";
+    if (order) order.status = "DELIVERED"; // Keep standard
+    logEvent("RETURN_APPROVED", "ADMIN", `Approved refund for Request #${reqId}.`, req.ip);
+  } else {
+    request.status = "REJECTED";
+    logEvent("RETURN_REJECTED", "ADMIN", `Rejected refund for Request #${reqId}.`, req.ip);
+  }
+  saveJSON("returnRequests.json", returnRequests);
+  saveJSON("orders.json", orders);
+
+  res.json({ success: true, request });
+});
+
+// Get Coupons List (Customer & Admin)
+app.get("/api/coupons", (req, res) => {
+  res.json(coupons);
+});
+
+// Create Coupon (Admin Panel)
+app.post("/api/coupons", (req, res) => {
+  const { code, discountPercent, description } = req.body;
+  if (!code || !discountPercent) {
+    return res.status(400).json({ error: "Missing required coupon details (code, discountPercent)." });
+  }
+
+  const codeUpper = code.toUpperCase().trim();
+  const exists = coupons.some(c => c.code === codeUpper);
+  if (exists) {
+    return res.status(400).json({ error: "Coupon code already exists." });
+  }
+
+  const newCoupon = {
+    code: codeUpper,
+    discountPercent: parseInt(discountPercent),
+    description: description || `${discountPercent}% discount promo code`,
+    active: true
+  };
+
+  coupons.push(newCoupon);
+  saveJSON("coupons.json", coupons);
+  logEvent("COUPON_CREATED", "ADMIN", `Created coupon code ${codeUpper} (${discountPercent}%).`, req.ip);
+
+  res.status(201).json(newCoupon);
+});
+
+// Get Audit Security Logs (Admin Panel)
+app.get("/api/admin/logs", (req, res) => {
+  res.json(auditLogs);
 });
 
 // Serve static assets
