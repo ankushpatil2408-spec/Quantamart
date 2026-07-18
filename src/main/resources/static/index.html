@@ -14,6 +14,17 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
+    <!-- Dynamic Promo Banner -->
+    <div id="promoBanner" class="promo-banner">
+        <div class="promo-banner-content">
+            <span class="promo-icon">⚡</span>
+            <span>Limited-Time Offer: Use code <strong class="promo-code">QUANTA15</strong> for 15% off our curated collection • Offer ends in <span id="promoCountdown" class="promo-countdown">02h 45m 12s</span></span>
+        </div>
+        <button id="closePromoBtn" class="close-promo-btn" aria-label="Close promo banner">
+            <i data-lucide="x"></i>
+        </button>
+    </div>
+
     <!-- Header -->
     <header class="header">
         <div class="header-container">
@@ -34,6 +45,18 @@
             </nav>
             <div style="display: flex; align-items: center; gap: 0.75rem;">
                 <span id="authSection" class="auth-section"></span>
+                <div class="currency-selector-wrapper">
+                    <button id="currencySelectBtn" class="currency-select-btn" aria-haspopup="listbox" aria-expanded="false" title="Switch Currency">
+                        <i data-lucide="globe" style="width: 16px; height: 16px;"></i>
+                        <span id="currentCurrencyLabel">USD ($)</span>
+                    </button>
+                    <ul id="currencyDropdown" class="currency-dropdown hidden" role="listbox">
+                        <li class="currency-option active" data-currency="USD" data-symbol="$" data-rate="1">USD ($)</li>
+                        <li class="currency-option" data-currency="EUR" data-symbol="€" data-rate="0.92">EUR (€)</li>
+                        <li class="currency-option" data-currency="INR" data-symbol="₹" data-rate="83.50">INR (₹)</li>
+                        <li class="currency-option" data-currency="GBP" data-symbol="£" data-rate="0.78">GBP (£)</li>
+                    </ul>
+                </div>
                 <button id="themeToggleBtn" class="theme-toggle-btn" aria-label="Toggle Theme">
                     <i data-lucide="moon"></i>
                 </button>
@@ -58,6 +81,36 @@
             <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
                 <path fill="#3B82F6" d="M44.7,-76.4C58.1,-69.2,69.2,-58.1,77.3,-44.7C85.4,-31.3,90.5,-15.7,89.2,-0.8C87.8,14.1,80,28.2,69.2,40.1C58.4,52,44.7,61.7,30.3,68.9C15.9,76.1,0.8,80.8,-14.2,78.2C-29.2,75.6,-44,65.7,-55.8,53.4C-67.6,41.1,-76.4,26.4,-80.3,10.6C-84.2,-5.2,-83.1,-22.1,-75.4,-36C-67.7,-49.9,-53.4,-60.8,-38.7,-67.4C-24,-74,-9,-76.3,4.1,-83.4C17.2,-90.5,31.3,-83.6,44.7,-76.4Z" transform="translate(100 100)" />
             </svg>
+        </div>
+    </section>
+
+    <!-- Interactive Category Pills -->
+    <section class="category-pills-section">
+        <div class="category-pills-container">
+            <button class="category-pill active" data-category="all" title="View all curated goods">
+                <i data-lucide="layout-grid"></i>
+                <span>All Goods</span>
+            </button>
+            <button class="category-pill" data-category="Electronics" title="Filter by Electronics">
+                <i data-lucide="laptop"></i>
+                <span>Electronics</span>
+            </button>
+            <button class="category-pill" data-category="Bags" title="Filter by Bags & Packs">
+                <i data-lucide="backpack"></i>
+                <span>Bags &amp; Packs</span>
+            </button>
+            <button class="category-pill" data-category="Kitchenware" title="Filter by Kitchenware">
+                <i data-lucide="utensils"></i>
+                <span>Kitchenware</span>
+            </button>
+            <button class="category-pill" data-category="Apparel" title="Filter by Apparel">
+                <i data-lucide="shirt"></i>
+                <span>Apparel</span>
+            </button>
+            <button class="category-pill" data-category="Lifestyle" title="Filter by Lifestyle">
+                <i data-lucide="sparkles"></i>
+                <span>Lifestyle</span>
+            </button>
         </div>
     </section>
 
@@ -236,21 +289,92 @@
         </div>
     </main>
 
-    <!-- Footer -->
+    <!-- Enhanced Footer -->
     <footer class="footer">
-        <div class="footer-container">
-            <div class="footer-left">
+        <div class="footer-grid-container">
+            <!-- Column 1: Brand details -->
+            <div class="footer-column brand-column">
+                <div class="footer-logo">
+                    <i data-lucide="package" class="logo-icon"></i>
+                    <span class="logo-text">Quantamart</span>
+                </div>
+                <p class="footer-slogan">
+                    Meticulously sourced, beautifully crafted lifestyle goods for modern spaces. Elevating your daily ritual.
+                </p>
+                <div class="footer-socials">
+                    <a href="#" class="social-icon-btn" aria-label="Twitter">
+                        <i data-lucide="twitter"></i>
+                    </a>
+                    <a href="#" class="social-icon-btn" aria-label="Instagram">
+                        <i data-lucide="instagram"></i>
+                    </a>
+                    <a href="#" class="social-icon-btn" aria-label="LinkedIn">
+                        <i data-lucide="linkedin"></i>
+                    </a>
+                    <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="social-icon-btn" aria-label="GitHub">
+                        <i data-lucide="github"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Column 2: Collections -->
+            <div class="footer-column">
+                <h4 class="footer-column-title">The Collection</h4>
+                <ul class="footer-links-list">
+                    <li><a href="#shop" class="footer-category-link" data-category="all">All Catalog</a></li>
+                    <li><a href="#shop" class="footer-category-link" data-category="Electronics">Electronics</a></li>
+                    <li><a href="#shop" class="footer-category-link" data-category="Bags">Bags</a></li>
+                    <li><a href="#shop" class="footer-category-link" data-category="Kitchenware">Kitchenware</a></li>
+                    <li><a href="#shop" class="footer-category-link" data-category="Apparel">Apparel</a></li>
+                    <li><a href="#shop" class="footer-category-link" data-category="Lifestyle">Lifestyle</a></li>
+                </ul>
+            </div>
+
+            <!-- Column 3: Quick Links / Customer Care -->
+            <div class="footer-column">
+                <h4 class="footer-column-title">Customer Care</h4>
+                <ul class="footer-links-list">
+                    <li><a href="#" id="footerAboutLink">About Us</a></li>
+                    <li><a href="#" id="footerContactLink">Contact Us</a></li>
+                    <li><a href="#" id="footerConsoleLink">Developer Console</a></li>
+                    <li><a href="#" id="footerEmailsLink">Simulated Email Hub</a></li>
+                    <li><a href="#" id="footerOrdersLink">My Orders</a></li>
+                </ul>
+            </div>
+
+            <!-- Column 4: Newsletter -->
+            <div class="footer-column newsletter-column">
+                <h4 class="footer-column-title">Join the Circle</h4>
+                <p class="newsletter-desc">
+                    Subscribe to receive collection releases, design essays, and a 10% welcome promo.
+                </p>
+                <form id="footerNewsletterForm" class="footer-newsletter-form">
+                    <div class="newsletter-input-wrapper">
+                        <input type="email" id="footerNewsletterEmail" placeholder="your@email.com" required autocomplete="off">
+                        <button type="submit" class="newsletter-submit-btn" aria-label="Subscribe">
+                            <i data-lucide="arrow-right"></i>
+                        </button>
+                    </div>
+                </form>
+                <div id="footerNewsletterStatus" class="newsletter-status-message"></div>
+            </div>
+        </div>
+
+        <div class="footer-bottom-divider"></div>
+
+        <div class="footer-bottom-container">
+            <div class="footer-bottom-left">
                 <p>&copy; 2026 Quantamart Essentials, Inc. All rights reserved.</p>
                 <p class="footer-meta">Powered by Node.js, Express, and Vanilla JavaScript.</p>
             </div>
-            <div class="footer-right">
+            <div class="footer-bottom-right">
                 <div class="status-indicator">
                     <span class="status-dot"></span>
-                    <span>Memory Storage Active</span>
+                    <span>Persistent Local JSON Storage</span>
                 </div>
                 <div class="status-indicator">
                     <span class="status-dot"></span>
-                    <span>Express Server v4.21.2</span>
+                    <span>Express Dev Server v4.21.2</span>
                 </div>
             </div>
         </div>
@@ -407,6 +531,7 @@
                 <div id="quickSeedHelp" class="quick-seed-help">
                     <h4>Test Accounts:</h4>
                     <ul>
+                        <li style="border-bottom: 1px dashed var(--border-dark); padding-bottom: 0.25rem; margin-bottom: 0.25rem;"><strong style="color: var(--accent);">VIP Profile:</strong> ankush / ankush123</li>
                         <li><strong>Customer:</strong> customer / customer123</li>
                         <li><strong>Seller:</strong> seller / seller123</li>
                         <li><strong>Admin:</strong> admin / admin123</li>

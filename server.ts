@@ -508,6 +508,115 @@ if (sentEmails.length === 0) {
   saveJSON("sentEmails.json", sentEmails);
 }
 
+// Seed VIP User, Orders, and Emails for Ankush Patil
+function seedAnkushPatil() {
+  // 1. Seed user account
+  const hasAnkushUser = users.some(u => u.email.toLowerCase() === "ankushpatil.2408@gmail.com" || u.username.toLowerCase() === "ankush");
+  if (!hasAnkushUser) {
+    // Remove duplicate/stale incomplete accounts
+    users = users.filter(u => u.username.toLowerCase() !== "ankushp" && u.email.toLowerCase() !== "ankush@example.com");
+    users.push({
+      id: users.length > 0 ? Math.max(...users.map(u => u.id)) + 1 : 4,
+      username: "ankush",
+      email: "ankushpatil.2408@gmail.com",
+      passwordHash: bcrypt.hashSync("ankush123", 10),
+      role: "CUSTOMER",
+      fullName: "Ankush Patil",
+      registeredAt: Date.now()
+    });
+    saveJSON("users.json", users);
+  }
+
+  // 2. Seed orders & payments
+  const hasAnkushOrders = orders.some(o => o.email.toLowerCase() === "ankushpatil.2408@gmail.com");
+  if (!hasAnkushOrders) {
+    const o1 = orders.length > 0 ? Math.max(...orders.map(o => o.id)) + 1 : 1001;
+    const o2 = o1 + 1;
+    const p1 = payments.length > 0 ? Math.max(...payments.map(p => p.id)) + 1 : 1;
+    const p2 = p1 + 1;
+
+    const payment1 = {
+      id: p1,
+      orderId: o1,
+      transactionId: "TXN-ANKS" + Math.floor(100000 + Math.random() * 900000),
+      amount: 194.40,
+      status: "COMPLETED" as const,
+      paymentMethod: "ONLINE" as const
+    };
+    const payment2 = {
+      id: p2,
+      orderId: o2,
+      transactionId: "COD-ANKS" + Math.floor(100000 + Math.random() * 900000),
+      amount: 180.00,
+      status: "PENDING" as const,
+      paymentMethod: "COD" as const
+    };
+
+    payments.push(payment1, payment2);
+    saveJSON("payments.json", payments);
+
+    const order1 = {
+      id: o1,
+      customerName: "Ankush Patil",
+      email: "ankushpatil.2408@gmail.com",
+      totalAmount: 194.40,
+      status: "DELIVERED",
+      payment: payment1
+    };
+    const order2 = {
+      id: o2,
+      customerName: "Ankush Patil",
+      email: "ankushpatil.2408@gmail.com",
+      totalAmount: 180.00,
+      status: "SHIPPED",
+      payment: payment2
+    };
+
+    orders.push(order1, order2);
+    saveJSON("orders.json", orders);
+
+    // 3. Seed emails
+    const welcomeText = `
+<div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 40px 20px; color: #0f172a; margin: 0;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+    <div style="background-color: #0f172a; padding: 32px; text-align: center;">
+      <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.025em;">Welcome, Ankush!</h1>
+    </div>
+    <div style="padding: 32px;">
+      <p style="font-size: 16px; line-height: 1.6; color: #334155; margin-top: 0;">Hi <strong>Ankush Patil</strong>,</p>
+      <p style="font-size: 16px; line-height: 1.6; color: #334155;">We are absolutely thrilled to welcome you to the QuantaMart community! You've successfully activated your VIP account under your personal email address <code>ankushpatil.2408@gmail.com</code>.</p>
+      <p style="font-size: 16px; line-height: 1.6; color: #334155;">As a premium VIP member, you have access to exclusive products, priority checkout services, and simulated workspace tools inside the Developer Console.</p>
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="#" style="background-color: #0f172a; color: #ffffff; padding: 12px 28px; font-weight: 600; text-decoration: none; border-radius: 6px; font-size: 15px; display: inline-block;">Start Exploring</a>
+      </div>
+    </div>
+  </div>
+</div>`;
+
+    sentEmails.unshift({
+      id: nextEmailId++,
+      to: "ankushpatil.2408@gmail.com",
+      subject: "Welcome to QuantaMart, Ankush Patil! (VIP Account Activated)",
+      body: welcomeText,
+      type: "REGISTRATION",
+      sentAt: new Date(Date.now() - 7200000).toISOString()
+    });
+
+    sentEmails.unshift({
+      id: nextEmailId++,
+      to: "ankushpatil.2408@gmail.com",
+      subject: `Your QuantaMart Order #${o1} is Confirmed!`,
+      body: generateOrderEmail(order1),
+      type: "ORDER_CONFIRMATION",
+      sentAt: new Date(Date.now() - 3600000).toISOString()
+    });
+
+    saveJSON("sentEmails.json", sentEmails);
+  }
+}
+
+seedAnkushPatil();
+
 // ==========================================================================
 // Advanced Feature Databases & Helpers for full-stack Workspace Support
 // ==========================================================================
@@ -744,6 +853,54 @@ app.post("/api/contact", (req, res) => {
 </div>`;
 
   sendEmail(email, `We received your inquiry: "${subject}" [${refCode}]`, htmlBody, "CONTACT_FORM");
+  res.status(200).json({ success: true, reference: refCode });
+});
+
+// API: Newsletter Subscription
+app.post("/api/newsletter/subscribe", (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Missing email address!" });
+  }
+
+  const refCode = `QMT-NEWS-${Math.floor(100000 + Math.random() * 900000)}`;
+  const htmlBody = `
+<div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 40px 20px; color: #0f172a; margin: 0;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+    <div style="background-color: #0f172a; padding: 32px; text-align: center;">
+      <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700;">Welcome to the Circle!</h1>
+      <p style="color: #cbd5e1; margin: 8px 0 0 0; font-size: 14px;">QuantaMart Curated Newsletter • Ref: ${refCode}</p>
+    </div>
+    <div style="padding: 32px;">
+      <p style="font-size: 16px; line-height: 1.6; color: #334155; margin-top: 0;">Hi there,</p>
+      <p style="font-size: 16px; line-height: 1.6; color: #334155;">Thank you for subscribing to our curated newsletter circle. You've joined a selected collective of design enthusiasts who appreciate meticulously sourced, beautifully crafted lifestyle goods.</p>
+      
+      <div style="background-color: #f8fafc; border-radius: 8px; padding: 24px; margin: 24px 0; border: 1px solid #e2e8f0; text-align: center;">
+        <span style="font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.1em; display: block; margin-bottom: 8px;">Your Welcome Gift Code</span>
+        <div style="font-family: 'Space Grotesk', 'JetBrains Mono', monospace; font-size: 28px; font-weight: 700; color: #0f172a; letter-spacing: 0.05em; background: #ffffff; padding: 12px; border-radius: 6px; border: 1px dashed #cbd5e1; display: inline-block;">
+          WELCOME10
+        </div>
+        <p style="font-size: 13px; color: #64748b; margin: 12px 0 0 0;">Enter this code during checkout to enjoy an instant <strong>10% discount</strong> on your first order.</p>
+      </div>
+
+      <h3 style="font-size: 15px; font-weight: 600; color: #0f172a; margin-top: 24px; margin-bottom: 12px;">What to Expect</h3>
+      <ul style="font-size: 14px; color: #475569; line-height: 1.6; padding-left: 20px; margin: 0 0 24px 0;">
+        <li style="margin-bottom: 8px;"><strong>Curated Catalog Releases:</strong> Early VIP access to our limited-edition lifestyle artifacts.</li>
+        <li style="margin-bottom: 8px;"><strong>Design Essays:</strong> Thoughts on minimal architecture, sustainable manufacturing, and form-meets-function philosophy.</li>
+        <li style="margin-bottom: 8px;"><strong>Private Promotions:</strong> Exclusive subscriber-only events and seasonal savings.</li>
+      </ul>
+
+      <p style="font-size: 14px; line-height: 1.6; color: #64748b; margin-bottom: 24px;">If you ever wish to unsubscribe, you can do so by clicking the "unsubscribe" link at the bottom of any subsequent email, or managing your circle settings. We're thrilled to have you with us.</p>
+      
+      <div style="border-top: 1px solid #e2e8f0; padding-top: 24px; margin-top: 32px;">
+        <p style="font-size: 12px; line-height: 1.5; color: #64748b; margin: 0;">This is a simulated transactional notification from your QuantaMart preview workspace.</p>
+        <p style="font-size: 12px; line-height: 1.5; color: #64748b; margin: 8px 0 0 0;">&copy; 2026 QuantaMart Essentials, Inc. All rights reserved.</p>
+      </div>
+    </div>
+  </div>
+</div>`;
+
+  sendEmail(email, `Welcome to the QuantaMart Circle! (10% Discount Code Inside)`, htmlBody, "REGISTRATION");
   res.status(200).json({ success: true, reference: refCode });
 });
 

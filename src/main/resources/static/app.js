@@ -12,6 +12,19 @@ let authMode = 'login'; // 'login' or 'register'
 // Theme Management State & Helpers
 let currentTheme = localStorage.getItem('theme') || 'light';
 
+// Currency Management State & Exchange Rates
+let currentCurrency = localStorage.getItem('currency') || 'USD';
+let currencySymbol = localStorage.getItem('currencySymbol') || '$';
+let currencyRate = parseFloat(localStorage.getItem('currencyRate')) || 1.0;
+
+function formatPrice(amount) {
+    const converted = amount * currencyRate;
+    if (currentCurrency === 'INR') {
+        return `₹${Math.round(converted).toLocaleString('en-IN')}`;
+    }
+    return `${currencySymbol}${converted.toFixed(2)}`;
+}
+
 function initTheme() {
     document.documentElement.setAttribute('data-theme', currentTheme);
     updateThemeIcon();
@@ -38,6 +51,163 @@ function updateThemeIcon() {
     if (window.lucide) {
         lucide.createIcons();
     }
+}
+
+// ==========================================================================
+// Dynamic & Clean UI Controllers
+// ==========================================================================
+
+// Dynamic Promo Banner & Countdown Timer
+function initPromoBanner() {
+    const promoBanner = document.getElementById('promoBanner');
+    const closePromoBtn = document.getElementById('closePromoBtn');
+    const promoCountdown = document.getElementById('promoCountdown');
+    
+    if (!promoBanner || !closePromoBtn || !promoCountdown) return;
+    
+    // Check if user previously closed it
+    if (localStorage.getItem('promo_closed') === 'true') {
+        promoBanner.classList.add('hidden');
+    }
+    
+    closePromoBtn.addEventListener('click', () => {
+        promoBanner.classList.add('hidden');
+        localStorage.setItem('promo_closed', 'true');
+    });
+    
+    // Dynamic countdown timer (e.g. counts down from 2h 45m 12s, resetting elegantly)
+    let totalSeconds = 2 * 3600 + 45 * 60 + 12; // 2h 45m 12s
+    
+    const interval = setInterval(() => {
+        if (totalSeconds <= 0) {
+            totalSeconds = 3 * 3600; // Reset to 3 hours elegantly
+        }
+        totalSeconds--;
+        
+        const h = Math.floor(totalSeconds / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        const s = totalSeconds % 60;
+        
+        const hStr = h.toString().padStart(2, '0');
+        const mStr = m.toString().padStart(2, '0');
+        const sStr = s.toString().padStart(2, '0');
+        
+        promoCountdown.textContent = `${hStr}h ${mStr}m ${sStr}s`;
+    }, 1000);
+}
+
+// Currency Switcher Interaction
+function initCurrency() {
+    const selectBtn = document.getElementById('currencySelectBtn');
+    const dropdown = document.getElementById('currencyDropdown');
+    const label = document.getElementById('currentCurrencyLabel');
+    
+    if (!selectBtn || !dropdown || !label) return;
+    
+    label.textContent = `${currentCurrency} (${currencySymbol})`;
+    
+    // Toggle dropdown
+    selectBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const expanded = selectBtn.getAttribute('aria-expanded') === 'true';
+        selectBtn.setAttribute('aria-expanded', !expanded);
+        dropdown.classList.toggle('hidden');
+    });
+    
+    // Close on click outside
+    document.addEventListener('click', () => {
+        dropdown.classList.add('hidden');
+        selectBtn.setAttribute('aria-expanded', 'false');
+    });
+    
+    // Click option
+    const options = dropdown.querySelectorAll('.currency-option');
+    options.forEach(opt => {
+        // Highlight correct option on load
+        if (opt.getAttribute('data-currency') === currentCurrency) {
+            options.forEach(o => o.classList.remove('active'));
+            opt.classList.add('active');
+        }
+        
+        opt.addEventListener('click', () => {
+            currentCurrency = opt.getAttribute('data-currency');
+            currencySymbol = opt.getAttribute('data-symbol');
+            currencyRate = parseFloat(opt.getAttribute('data-rate'));
+            
+            localStorage.setItem('currency', currentCurrency);
+            localStorage.setItem('currencySymbol', currencySymbol);
+            localStorage.setItem('currencyRate', currencyRate);
+            
+            label.textContent = `${currentCurrency} (${currencySymbol})`;
+            
+            options.forEach(o => o.classList.remove('active'));
+            opt.classList.add('active');
+            
+            // Re-render everything that uses price formatting
+            renderProducts();
+            updateCartUI();
+            
+            showToast(`Switched currency to ${currentCurrency}.`, 'success');
+        });
+    });
+}
+
+// Interactive Category Pills
+function initCategoryPills() {
+    const pills = document.querySelectorAll('.category-pill');
+    pills.forEach(pill => {
+        pill.addEventListener('click', () => {
+            const cat = pill.getAttribute('data-category');
+            
+            // Sync with sidebar radio option
+            const radio = document.querySelector(`input[name="categoryFilter"][value="${cat}"]`);
+            if (radio) {
+                radio.checked = true;
+                // Dispatch event to trigger existing app logic
+                radio.dispatchEvent(new Event('change'));
+            }
+            
+            pills.forEach(p => p.classList.remove('active'));
+            pill.classList.add('active');
+            
+            // Smooth scroll to product grid
+            const shopSec = document.getElementById('shop');
+            if (shopSec) {
+                shopSec.scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+    });
+}
+
+// Synchronize category pills from other filter triggers
+function syncCategoryPills() {
+    const pills = document.querySelectorAll('.category-pill');
+    pills.forEach(pill => {
+        if (pill.getAttribute('data-category') === activeCategory) {
+            pill.classList.add('active');
+        } else {
+            pill.classList.remove('active');
+        }
+    });
+}
+
+// Dynamic Hero Greeting
+function updateHeroGreeting() {
+    const greetingEl = document.getElementById('heroGreeting');
+    if (!greetingEl) return;
+    
+    const hour = new Date().getHours();
+    let timeGreeting = "Welcome";
+    if (hour < 12) {
+        timeGreeting = "Good Morning";
+    } else if (hour < 18) {
+        timeGreeting = "Good Afternoon";
+    } else {
+        timeGreeting = "Good Evening";
+    }
+    
+    const name = authUser ? (authUser.fullName || authUser.username) : "Explorer";
+    greetingEl.innerHTML = `✨ ${timeGreeting}, ${name} • Summer Collection 2026`;
 }
 
 // Search and Filter State
@@ -101,6 +271,9 @@ const ORDERS_API = '/api/orders';
 // Initialize on Load
 window.addEventListener('DOMContentLoaded', () => {
     initTheme();
+    initCurrency();
+    initPromoBanner();
+    initCategoryPills();
     fetchProducts();
     updateAuthUI();
     setupEventListeners();
@@ -236,7 +409,7 @@ function renderProducts() {
                 </div>
                 <p class="product-desc">${product.description || 'No description available.'}</p>
                 <div class="product-footer">
-                    <span class="product-price">$${product.price.toFixed(2)}</span>
+                    <span class="product-price">${formatPrice(product.price)}</span>
                     <button class="add-to-cart-btn" onclick="addToCart(${product.id})" aria-label="Add to cart">
                         <i data-lucide="plus"></i>
                     </button>
@@ -338,7 +511,7 @@ function openProductDetail(id) {
                 <span class="${isOutOfStock ? 'stock-out' : 'stock-in'}">${isOutOfStock ? 'Out of stock' : `In stock (${product.stock} available)`}</span>
             </div>
             <div class="detail-price-row">
-                <span class="detail-price">$${product.price.toFixed(2)}</span>
+                <span class="detail-price">${formatPrice(product.price)}</span>
                 <button class="detail-add-btn" onclick="addToCart(${product.id}); closeDetail();" ${isOutOfStock ? 'disabled' : ''}>
                     <i data-lucide="shopping-cart"></i> Add to Cart
                 </button>
@@ -412,7 +585,7 @@ async function fetchAIRecommendations(productId) {
                     <img class="ai-rec-img" src="${rec.imageUrl}" alt="${rec.name}">
                     <div style="display: flex; flex-direction: column; gap: 0.25rem;">
                         <h4 class="ai-rec-title" title="${rec.name}">${rec.name}</h4>
-                        <div class="ai-rec-price">$${rec.price.toFixed(2)}</div>
+                        <div class="ai-rec-price">${formatPrice(rec.price)}</div>
                     </div>
                     <p class="ai-rec-reason">${rec.reason}</p>
                 </div>
@@ -474,8 +647,8 @@ function updateCartUI() {
     
     // Subtotal & Grand Total
     const subtotal = cart.reduce((total, item) => total + (item.product.price * item.quantity), 0);
-    cartSubtotal.textContent = `$${subtotal.toFixed(2)}`;
-    cartTotal.textContent = `$${subtotal.toFixed(2)}`;
+    cartSubtotal.textContent = formatPrice(subtotal);
+    cartTotal.textContent = formatPrice(subtotal);
     
     // Render Items inside List
     cartItemsContainer.innerHTML = '';
@@ -499,7 +672,7 @@ function updateCartUI() {
             <img class="cart-item-img" src="${item.product.imageUrl}" alt="${item.product.name}">
             <div class="cart-item-info">
                 <h4 class="cart-item-title">${item.product.name}</h4>
-                <div class="cart-item-price">$${item.product.price.toFixed(2)}</div>
+                <div class="cart-item-price">${formatPrice(item.product.price)}</div>
             </div>
             <div class="cart-item-controls">
                 <button class="qty-btn" onclick="adjustQty(${item.product.id}, -1)">-</button>
@@ -619,7 +792,7 @@ async function handleCheckout(e) {
         const paymentInfo = savedOrder.payment || {};
         document.getElementById('receiptOrderId').textContent = `#${savedOrder.id}`;
         document.getElementById('receiptCustomerName').textContent = savedOrder.customerName;
-        document.getElementById('receiptAmount').textContent = `$${savedOrder.totalAmount.toFixed(2)}`;
+        document.getElementById('receiptAmount').textContent = formatPrice(savedOrder.totalAmount);
         document.getElementById('receiptPaymentMethod').textContent = paymentInfo.paymentMethod || 'COD';
         document.getElementById('receiptTransactionId').textContent = paymentInfo.transactionId || 'N/A';
         
@@ -768,7 +941,7 @@ async function fetchUserOrders(email) {
                     </div>
                     <div>
                         <span class="oh-label">Total:</span>
-                        <span class="oh-val" style="color: var(--accent); font-weight: 600;">$${order.totalAmount.toFixed(2)}</span>
+                        <span class="oh-val" style="color: var(--accent); font-weight: 600;">${formatPrice(order.totalAmount)}</span>
                     </div>
                     <div>
                         <span class="oh-label">Payment Method:</span>
@@ -895,6 +1068,7 @@ function setupEventListeners() {
     categoryFilters.forEach(radio => {
         radio.addEventListener('change', (e) => {
             activeCategory = e.target.value;
+            syncCategoryPills();
             currentPage = 1;
             renderProducts();
         });
@@ -968,6 +1142,9 @@ function setupEventListeners() {
             categoryFilters.forEach(r => r.checked = (r.value === 'all'));
             brandFilters.forEach(cb => cb.checked = false);
             ratingFilters.forEach(r => r.checked = (r.value === '0'));
+            
+            activeCategory = 'all';
+            syncCategoryPills();
             
             renderProducts();
             showToast('All filters have been reset.');
@@ -1131,12 +1308,14 @@ function setupEventListeners() {
             contactModal.classList.add('active');
             setActiveNav(contactNavBtn);
             
-            // Pre-populate if logged in
+            // Pre-populate if logged in, or use Ankush Patil as default fallback
             const contactName = document.getElementById('contactName');
             const contactEmail = document.getElementById('contactEmail');
-            if (authUser) {
-                if (contactName && !contactName.value) contactName.value = authUser.username;
-                if (contactEmail && !contactEmail.value) contactEmail.value = authUser.email;
+            if (contactName && !contactName.value) {
+                contactName.value = authUser ? (authUser.fullName || authUser.username) : "Ankush Patil";
+            }
+            if (contactEmail && !contactEmail.value) {
+                contactEmail.value = authUser ? authUser.email : "ankushpatil.2408@gmail.com";
             }
         });
     }
@@ -1213,7 +1392,7 @@ function setupEventListeners() {
             setActiveNav(ordersNavBtn);
             
             const customerEmailInput = document.getElementById('customerEmail');
-            const email = (authUser ? authUser.email : '') || (customerEmailInput ? customerEmailInput.value : '') || '';
+            const email = (authUser ? authUser.email : '') || (customerEmailInput ? customerEmailInput.value : '') || 'ankushpatil.2408@gmail.com';
             
             if (lookupEmailInput) {
                 lookupEmailInput.value = email;
@@ -1381,12 +1560,17 @@ function updateAuthUI() {
     if (window.lucide) {
         lucide.createIcons();
     }
+    
+    // Dynamically update the Hero section greeting on login/logout/load
+    updateHeroGreeting();
 }
 
 function openAuth() {
     authModal.classList.add('active');
     authForm.reset();
     setAuthMode('login');
+    if (authUsername) authUsername.value = 'ankush';
+    if (authPassword) authPassword.value = 'ankush123';
 }
 
 function closeAuth() {
@@ -1502,6 +1686,7 @@ let selectedEmailId = null;
 window.addEventListener('DOMContentLoaded', () => {
     initNotificationsHub();
     initPasswordResetFlow();
+    initFooterInteractions();
 });
 
 // Setup badge & fetch check periodically
@@ -1985,8 +2170,7 @@ function initAiShoppingAssistant() {
                         <div class="ai-product-details" onclick="openProductDetail(${product.id}); document.getElementById('aiChatPanel').classList.add('hidden');" style="cursor: pointer; min-width: 0;">
                             <h4 class="ai-product-name">${product.name}</h4>
                             <div class="ai-product-price">
-                                $${product.price.toFixed(2)}
-                                <span class="inr-conv">(~₹${inrVal})</span>
+                                ${formatPrice(product.price)}
                             </div>
                             <div class="ai-product-rating">${ratingStars} ${ratingVal.toFixed(1)}</div>
                         </div>
@@ -2068,3 +2252,168 @@ function initAiShoppingAssistant() {
 window.addEventListener('load', () => {
     initAiShoppingAssistant();
 });
+
+// Enhanced Footer Interactions and Newsletter Submission
+function initFooterInteractions() {
+    // 1. Category Quick Links in Footer
+    const footerCategoryLinks = document.querySelectorAll('.footer-category-link');
+    footerCategoryLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const categoryValue = link.getAttribute('data-category');
+            
+            // Find corresponding radio filter
+            const radioFilter = document.querySelector(`input[name="categoryFilter"][value="${categoryValue}"]`);
+            if (radioFilter) {
+                radioFilter.checked = true;
+                // Dispatch change event to update state and render
+                radioFilter.dispatchEvent(new Event('change'));
+            }
+
+            // Scroll to the catalog smoothly
+            const shopSection = document.getElementById('shop');
+            if (shopSection) {
+                shopSection.scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+    });
+
+    // 2. Customer Care / Quick Links in Footer
+    const footerAboutLink = document.getElementById('footerAboutLink');
+    const footerContactLink = document.getElementById('footerContactLink');
+    const footerConsoleLink = document.getElementById('footerConsoleLink');
+    const footerEmailsLink = document.getElementById('footerEmailsLink');
+    const footerOrdersLink = document.getElementById('footerOrdersLink');
+
+    // Modals & Navigation Buttons
+    const aboutNavBtn = document.getElementById('aboutNavBtn');
+    const contactNavBtn = document.getElementById('contactNavBtn');
+    const workspaceNavBtn = document.getElementById('workspaceNavBtn');
+    const notificationsNavBtn = document.getElementById('notificationsNavBtn');
+    const ordersNavBtn = document.getElementById('ordersNavBtn');
+
+    // Modals containers
+    const aboutModal = document.getElementById('aboutModal');
+    const contactModal = document.getElementById('contactModal');
+
+    if (footerAboutLink && aboutNavBtn) {
+        footerAboutLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            aboutNavBtn.click();
+            if (aboutModal) {
+                aboutModal.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+    }
+
+    if (footerContactLink && contactNavBtn) {
+        footerContactLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            contactNavBtn.click();
+            if (contactModal) {
+                contactModal.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+    }
+
+    if (footerConsoleLink && workspaceNavBtn) {
+        footerConsoleLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            workspaceNavBtn.click();
+            workspaceNavBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+    }
+
+    if (footerEmailsLink && notificationsNavBtn) {
+        footerEmailsLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            notificationsNavBtn.click();
+        });
+    }
+
+    if (footerOrdersLink) {
+        footerOrdersLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (ordersNavBtn) {
+                ordersNavBtn.click();
+            } else {
+                const orderLookupBtn = document.getElementById('orderLookupBtn');
+                if (orderLookupBtn) orderLookupBtn.click();
+            }
+        });
+    }
+
+    // 3. Newsletter subscription form handling
+    const newsletterForm = document.getElementById('footerNewsletterForm');
+    const newsletterEmailInput = document.getElementById('footerNewsletterEmail');
+    const newsletterStatus = document.getElementById('footerNewsletterStatus');
+
+    if (newsletterForm) {
+        newsletterForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = newsletterEmailInput.value;
+            if (!email) return;
+
+            try {
+                // Style progress
+                const submitBtn = newsletterForm.querySelector('button[type="submit"]');
+                const originalBtnContent = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<div class="spinner" style="width: 14px; height: 14px; border-width: 2px;"></div>';
+                
+                if (newsletterStatus) {
+                    newsletterStatus.className = 'newsletter-status-message';
+                    newsletterStatus.textContent = '';
+                }
+
+                const response = await fetch('/api/newsletter/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Subscription failed. Please check your network.');
+                }
+
+                const data = await response.json();
+                
+                // Show success
+                if (newsletterStatus) {
+                    newsletterStatus.className = 'newsletter-status-message success';
+                    newsletterStatus.innerHTML = `✓ Subscribed! Promo code sent to Emails Hub.`;
+                }
+                newsletterForm.reset();
+
+                showToast('Welcome to the circle! Promo code sent.', 'success');
+
+                // Restore button
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnContent;
+
+                // Auto open emails hub to show simulation
+                setTimeout(() => {
+                    if (notificationsNavBtn) {
+                        notificationsNavBtn.click();
+                        const regPill = document.querySelector('.filter-pills button[data-filter="REGISTRATION"]');
+                        if (regPill) regPill.click();
+                    }
+                }, 1500);
+
+            } catch (err) {
+                console.error(err);
+                if (newsletterStatus) {
+                    newsletterStatus.className = 'newsletter-status-message error';
+                    newsletterStatus.textContent = '❌ Failed to subscribe. Please try again.';
+                }
+                
+                const submitBtn = newsletterForm.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i data-lucide="arrow-right"></i>';
+                }
+                if (window.lucide) lucide.createIcons();
+            }
+        });
+    }
+}
